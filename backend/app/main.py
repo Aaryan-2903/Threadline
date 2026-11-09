@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import projects
+from app.api.routes import activities, decisions, projects, tasks
 from app.core.config import settings
 from app.database import init_db
 
@@ -31,6 +31,9 @@ app.add_middleware(
 
 # Mount API routes
 app.include_router(projects.router, prefix=settings.API_V1_STR)
+app.include_router(tasks.router, prefix=settings.API_V1_STR)
+app.include_router(decisions.router, prefix=settings.API_V1_STR)
+app.include_router(activities.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

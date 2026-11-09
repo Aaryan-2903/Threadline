@@ -1,3 +1,5 @@
+from app.schemas.activity import ActivityResponse
+from app.schemas.decision import DecisionCreate, DecisionResponse, DecisionUpdate
 from app.schemas.project import (
     ProjectBase,
     ProjectCreate,
@@ -5,6 +7,7 @@ from app.schemas.project import (
     ProjectStatus,
     ProjectUpdate,
 )
+from app.schemas.task import TaskCreate, TaskPriority, TaskResponse, TaskStatus, TaskUpdate
 
 __all__ = [
     "ProjectBase",
@@ -12,5 +15,13 @@ __all__ = [
     "ProjectUpdate",
     "ProjectResponse",
     "ProjectStatus",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskResponse",
+    "TaskStatus",
+    "TaskPriority",
+    "DecisionCreate",
+    "DecisionUpdate",
+    "DecisionResponse",
+    "ActivityResponse",
 ]
-

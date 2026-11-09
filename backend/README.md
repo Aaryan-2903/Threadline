@@ -14,28 +14,43 @@ backend/
 │   ├── api/
 │   │   ├── routes/
 │   │   │   ├── __init__.py
-│   │   │   └── projects.py       # Project route handlers (POST, GET, PATCH, DELETE)
+│   │   │   ├── projects.py       # Project routes + nested task, decision & timeline endpoints
+│   │   │   ├── tasks.py          # Standalone task route handlers (CRUD & filtering)
+│   │   │   ├── decisions.py      # Standalone decision route handlers (CRUD)
+│   │   │   └── activities.py     # System-wide and project activity timeline handlers
 │   │   └── __init__.py
 │   ├── core/
 │   │   ├── __init__.py
 │   │   └── config.py             # Pydantic Settings & environment variable configuration
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── project.py            # SQLAlchemy Project ORM model
+│   │   ├── project.py            # SQLAlchemy Project ORM model with cascade relationships
+│   │   ├── task.py               # SQLAlchemy Task ORM model (status, priority, assignee)
+│   │   ├── decision.py           # SQLAlchemy Decision ORM model (rationale, decided_by)
+│   │   └── activity.py           # SQLAlchemy Activity ORM model (event_type, timeline)
 │   ├── schemas/
 │   │   ├── __init__.py
-│   │   └── project.py            # Pydantic schemas (ProjectCreate, ProjectUpdate, ProjectResponse)
+│   │   ├── project.py            # Pydantic schemas (ProjectCreate, ProjectUpdate, ProjectResponse)
+│   │   ├── task.py               # Pydantic schemas (TaskCreate, TaskUpdate, TaskResponse)
+│   │   ├── decision.py           # Pydantic schemas (DecisionCreate, DecisionUpdate, DecisionResponse)
+│   │   └── activity.py           # Pydantic schema (ActivityResponse)
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── project_service.py    # Database business logic & query operations
+│   │   ├── project_service.py    # Database business logic for projects
+│   │   ├── task_service.py       # Task business logic & activity event triggers
+│   │   ├── decision_service.py   # Decision business logic & activity event triggers
+│   │   └── activity_service.py   # Activity timeline recording & retrieval
 │   ├── __init__.py
-│   ├── database.py               # Engine, SessionLocal, Base, get_db dependency, init_db
+│   ├── database.py               # Engine, SessionLocal, Base, get_db dependency, init_db, SQLite pragmas
 │   └── main.py                   # FastAPI app instance, lifespan table creation, CORS, routers
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py               # Test configuration & isolated SQLite in-memory fixtures
-│   └── test_projects.py          # Automated pytest test suite
-├── requirements.txt              # Production and development dependencies
+│   ├── test_projects.py          # Project management test suite (15 tests)
+│   ├── test_tasks.py             # Task management test suite (16 tests)
+│   ├── test_decisions.py         # Decision records test suite (14 tests)
+│   └── test_activities.py        # Activity timeline & cascading test suite (10 tests)
+├── requirements.txt              # Dependencies (including psycopg, SQLAlchemy, FastAPI, pytest)
 └── README.md                     # Backend setup & API documentation
 ```
 
@@ -62,7 +77,8 @@ Configuration is loaded from environment variables or a `.env` file located in `
 ### Database Connectivity Details
 - **Local Development**: If `DATABASE_URL` is omitted or empty, the application automatically defaults to a local SQLite database (`sqlite:///./threadline.db`), allowing zero-configuration setup.
 - **Production (PostgreSQL)**: When using PostgreSQL with psycopg 3, set `DATABASE_URL=postgresql+psycopg://user:password@host:port/dbname`. (Standard `postgresql://` connection strings are also automatically adapted for psycopg 3 compatibility).
-- **Automated Startup Table Creation**: During application startup, `init_db()` is executed within FastAPI's lifespan event to ensure all database tables are created automatically for this MVP.
+- **Automated Startup Table Creation**: During application startup, `init_db()` is executed within FastAPI's lifespan event to ensure all database tables (`projects`, `tasks`, `decisions`, `activities`) are created automatically for this MVP.
+- **SQLite Foreign Keys**: Foreign key constraints are automatically enabled in SQLite via `PRAGMA foreign_keys=ON;`.
 
 ---
 
@@ -108,92 +124,160 @@ Once running, interactive OpenAPI API docs are available at:
 
 ---
 
-## Project Management API
+## API Documentation
 
-All project management endpoints are mounted under `/api/v1/projects`:
+All routes are mounted under `/api/v1`.
 
-### 1. Create a Project
-- **Method**: `POST`
-- **Path**: `/api/v1/projects/`
+### 1. Project Management
+
+- `POST /api/v1/projects/` — Create a project (`201 Created`)
+- `GET /api/v1/projects/` — List all projects (`200 OK`, newest first)
+- `GET /api/v1/projects/{project_id}` — Retrieve single project (`200 OK` or `404 Not Found`)
+- `PATCH /api/v1/projects/{project_id}` — Update project name, description or status (`200 OK` or `404`)
+- `DELETE /api/v1/projects/{project_id}` — Delete project and cascade-delete child tasks, decisions, and activities (`204 No Content` or `404`)
+
+---
+
+### 2. Task Management
+
+Tasks can be created and listed either nested under a project or via top-level task endpoints.
+
+#### Create Task
+- **Methods & Paths**:
+  - `POST /api/v1/projects/{project_id}/tasks`
+  - `POST /api/v1/tasks/` (requires `project_id` in request body)
 - **Status Code**: `201 Created`
 - **Request Body**:
   ```json
   {
-    "name": "Project Threadline",
-    "description": "Knowledge handover platform",
-    "status": "active"
+    "title": "Set up database migrations",
+    "description": "Configure Alembic and base schemas",
+    "status": "todo",
+    "priority": "high",
+    "assignee": "Alice",
+    "due_date": "2026-12-01T12:00:00Z"
   }
   ```
-  *Validation*: `name` is required, maximum 120 characters, non-blank (empty or whitespace-only strings are rejected with `422 Unprocessable Entity`). `status` defaults to `"active"` (`"active"` or `"archived"`). `description` is optional.
-- **Response**:
-  ```json
-  {
-    "id": "74ac0f3f-68ea-49db-ba94-8d7250cb21ab",
-    "name": "Project Threadline",
-    "description": "Knowledge handover platform",
-    "status": "active",
-    "created_at": "2026-11-09T12:00:00Z",
-    "updated_at": "2026-11-09T12:00:00Z"
-  }
-  ```
+  *Allowed status values*: `todo`, `in_progress`, `done`, `blocked` (default: `todo`).
+  *Allowed priority values*: `low`, `medium`, `high`, `urgent` (default: `medium`).
+  *Validation*: `title` is required, non-blank, max 200 characters. Target project must exist.
+- **Activity Trigger**: Automatically records a `task_created` event on the project activity timeline.
 
-### 2. List All Projects
-- **Method**: `GET`
-- **Path**: `/api/v1/projects/`
-- **Query Parameters**:
-  - `skip` (optional, default: `0`): Number of items to skip.
-  - `limit` (optional, default: `100`, max: `500`): Maximum items to return.
+#### List Tasks
+- **Methods & Paths**:
+  - `GET /api/v1/projects/{project_id}/tasks`
+  - `GET /api/v1/tasks/?project_id={project_id}&status={status}&priority={priority}&skip=0&limit=100`
 - **Status Code**: `200 OK`
-- **Ordering**: Returns projects ordered **newest first** (`created_at` descending).
-- **Response**:
-  ```json
-  [
-    {
-      "id": "74ac0f3f-68ea-49db-ba94-8d7250cb21ab",
-      "name": "Project Threadline",
-      "description": "Knowledge handover platform",
-      "status": "active",
-      "created_at": "2026-11-09T12:00:00Z",
-      "updated_at": "2026-11-09T12:00:00Z"
-    }
-  ]
-  ```
 
-### 3. Retrieve a Single Project
-- **Method**: `GET`
-- **Path**: `/api/v1/projects/{project_id}`
-- **Status Code**: `200 OK` (or `404 Not Found` if project does not exist)
-- **Response**:
-  ```json
-  {
-    "id": "74ac0f3f-68ea-49db-ba94-8d7250cb21ab",
-    "name": "Project Threadline",
-    "description": "Knowledge handover platform",
-    "status": "active",
-    "created_at": "2026-11-09T12:00:00Z",
-    "updated_at": "2026-11-09T12:00:00Z"
-  }
-  ```
+#### Retrieve Task
+- **Method & Path**: `GET /api/v1/tasks/{task_id}`
+- **Status Code**: `200 OK` (or `404 Not Found`)
 
-### 4. Update a Project
-- **Method**: `PATCH`
-- **Path**: `/api/v1/projects/{project_id}`
-- **Status Code**: `200 OK` (or `404 Not Found` if project does not exist)
+#### Update Task
+- **Method & Path**: `PATCH /api/v1/tasks/{task_id}`
+- **Status Code**: `200 OK` (or `404 Not Found`)
 - **Request Body** (all fields optional):
   ```json
   {
-    "name": "Updated Project Name",
-    "description": "Updated project description",
-    "status": "archived"
+    "status": "in_progress",
+    "priority": "urgent"
   }
   ```
-  *Validation*: If `name` is provided, it cannot be blank or exceed 120 characters. Untouched fields are preserved.
-- **Response**: Returns the updated `ProjectResponse`.
+- **Activity Triggers**:
+  - When status changes: records a `task_status_changed` event (`"Task '...' status changed from 'todo' to 'in_progress'"`).
+  - When other fields change: records a `task_updated` event (`"Task '...' was updated"`).
+  - When update makes no changes: avoids creating duplicate activity records.
 
-### 5. Delete a Project
-- **Method**: `DELETE`
-- **Path**: `/api/v1/projects/{project_id}`
-- **Status Code**: `204 No Content` (or `404 Not Found` if project does not exist)
+#### Delete Task
+- **Method & Path**: `DELETE /api/v1/tasks/{task_id}`
+- **Status Code**: `204 No Content` (or `404 Not Found`)
+- **Activity Trigger**: Records a `task_deleted` event on the timeline.
+
+---
+
+### 3. Decision Records
+
+Document architectural, organizational, and operational decisions taken throughout a project.
+
+#### Create Decision
+- **Methods & Paths**:
+  - `POST /api/v1/projects/{project_id}/decisions`
+  - `POST /api/v1/decisions/` (requires `project_id` in request body)
+- **Status Code**: `201 Created`
+- **Request Body**:
+  ```json
+  {
+    "title": "Use PostgreSQL for production persistence",
+    "description": "Selected PostgreSQL with psycopg 3 for production stability.",
+    "rationale": "High reliability, JSONB capabilities, and native UUID support.",
+    "decided_by": "Architecture Guild",
+    "decision_date": "2026-11-09T12:00:00Z"
+  }
+  ```
+  *Validation*: `title` is required, non-blank, max 200 characters. Target project must exist.
+- **Activity Trigger**: Automatically records a `decision_created` event.
+
+#### List Decisions
+- **Methods & Paths**:
+  - `GET /api/v1/projects/{project_id}/decisions`
+  - `GET /api/v1/decisions/?project_id={project_id}&skip=0&limit=100`
+- **Status Code**: `200 OK` (ordered newest decision date first)
+
+#### Retrieve Decision
+- **Method & Path**: `GET /api/v1/decisions/{decision_id}`
+- **Status Code**: `200 OK` (or `404 Not Found`)
+
+#### Update Decision
+- **Method & Path**: `PATCH /api/v1/decisions/{decision_id}`
+- **Status Code**: `200 OK` (or `404 Not Found`)
+- **Activity Trigger**: Records a `decision_updated` event when fields change.
+
+#### Delete Decision
+- **Method & Path**: `DELETE /api/v1/decisions/{decision_id}`
+- **Status Code**: `204 No Content` (or `404 Not Found`)
+- **Activity Trigger**: Records a `decision_deleted` event.
+
+---
+
+### 4. Project Activity Timeline
+
+Chronologically track key project events including task creation, task updates, status transitions, and decision records.
+
+#### Endpoints
+- `GET /api/v1/projects/{project_id}/activities` — Project activity timeline
+- `GET /api/v1/projects/{project_id}/timeline` — Timeline alias
+- `GET /api/v1/activities/?project_id={project_id}` — Global activity query endpoint
+
+#### Query Parameters
+- `order` (optional, default: `"desc"`): Sort order by timestamp (`"desc"` for newest first, `"asc"` for chronological order).
+- `skip` (optional, default: `0`): Pagination offset.
+- `limit` (optional, default: `100`, max: `500`): Maximum items returned.
+
+#### Response Structure
+```json
+[
+  {
+    "id": "e2f08a54-71bb-48f8-b39b-e85df6495db3",
+    "project_id": "74ac0f3f-68ea-49db-ba94-8d7250cb21ab",
+    "event_type": "task_status_changed",
+    "description": "Task 'Set up database migrations' status changed from 'todo' to 'in_progress'",
+    "actor": "Alice",
+    "entity_type": "task",
+    "entity_id": "5cb89262-6da5-4be4-b892-e421528659b7",
+    "timestamp": "2026-11-09T12:30:00Z"
+  },
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "project_id": "74ac0f3f-68ea-49db-ba94-8d7250cb21ab",
+    "event_type": "decision_created",
+    "description": "Decision 'Use PostgreSQL for production persistence' was recorded",
+    "actor": "Architecture Guild",
+    "entity_type": "decision",
+    "entity_id": "89ab12cd-ef34-5678-90ab-cdef12345678",
+    "timestamp": "2026-11-09T12:00:00Z"
+  }
+]
+```
 
 ---
 
@@ -221,20 +305,8 @@ cd backend
 pytest -v
 ```
 
-### Test Suite Coverage
-- `test_root_and_health_endpoints`: Verifies `/` and `/health` endpoints are preserved and working.
-- `test_create_project_success`: Validates successful creation of projects with UUID, timestamps, and active status.
-- `test_create_project_default_status`: Verifies default status is `"active"`.
-- `test_create_project_archived_status`: Verifies explicit `"archived"` status.
-- `test_create_project_blank_name_rejected`: Tests rejection of empty, whitespace-only, and missing project names.
-- `test_create_project_name_exceeds_max_length`: Tests rejection of names exceeding 120 characters.
-- `test_list_projects_empty`: Verifies empty list when no projects exist.
-- `test_list_projects_ordered_newest_first`: Verifies sorting ordered newest first.
-- `test_get_project_success`: Retrieves project by UUID.
-- `test_get_project_not_found`: Verifies 404 response on nonexistent UUID.
-- `test_update_project_success`: Verifies PATCH updates name, description, and status.
-- `test_update_project_blank_name_rejected`: Verifies 422 response when patching with blank name.
-- `test_update_project_not_found`: Verifies 404 response when patching nonexistent project.
-- `test_delete_project_success`: Verifies 204 No Content and removal of project.
-- `test_delete_project_not_found`: Verifies 404 response when deleting nonexistent project.
-
+### Test Suite Summary (55 Tests Passing)
+- `test_projects.py` (15 tests): Project CRUD, validation, 404s, newest-first ordering, preserved root and health endpoints.
+- `test_tasks.py` (16 tests): Task creation (nested and top-level), project validation (404 on ghost project), blank and max-length title validation, invalid status/priority validation (422), task retrieval, filtering by status and priority, patching fields, status updates, 404s on nonexistent tasks, task deletion.
+- `test_decisions.py` (14 tests): Decision creation, project validation, rationale, decided_by, decision_date default and explicit values, title validation, decision retrieval, updates, 404s, decision deletion.
+- `test_activities.py` (10 tests): `task_created`, `task_status_changed`, `task_updated`, `task_deleted`, `decision_created`, `decision_updated`, `decision_deleted` activity events; duplicate activity avoidance on zero-change updates; ascending and descending timeline ordering; timeline alias endpoint; 404 on nonexistent project; cascading deletion of child tasks, decisions, and activities on project delete.
