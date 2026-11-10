@@ -7,7 +7,7 @@ from app.models.task import TaskPriority, TaskStatus
 
 class TaskBase(BaseModel):
     title: str = Field(..., max_length=200, description="Task title")
-    description: Optional[str] = Field(default=None, description="Task description")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Task description")
     status: TaskStatus = Field(default=TaskStatus.TODO, description="Task status")
     priority: TaskPriority = Field(default=TaskPriority.MEDIUM, description="Task priority")
     assignee: Optional[str] = Field(default=None, max_length=120, description="Task assignee")
@@ -17,7 +17,7 @@ class TaskBase(BaseModel):
 class TaskCreate(BaseModel):
     project_id: Optional[UUID] = Field(default=None, description="Project ID (if not provided in route path)")
     title: str = Field(..., max_length=200, description="Task title")
-    description: Optional[str] = Field(default=None, description="Task description")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Task description")
     status: TaskStatus = Field(default=TaskStatus.TODO, description="Task status")
     priority: TaskPriority = Field(default=TaskPriority.MEDIUM, description="Task priority")
     assignee: Optional[str] = Field(default=None, max_length=120, description="Task assignee")
@@ -39,7 +39,7 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200, description="Task title")
-    description: Optional[str] = Field(default=None, description="Task description")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Task description")
     status: Optional[TaskStatus] = Field(default=None, description="Task status")
     priority: Optional[TaskPriority] = Field(default=None, description="Task priority")
     assignee: Optional[str] = Field(default=None, max_length=120, description="Task assignee")

@@ -59,7 +59,7 @@ def get_review(
 )
 def approve_review(
     review_id: UUID,
-    actor: Optional[str] = Query(None, description="Name or role of reviewer"),
+    actor: Optional[str] = Query(None, max_length=120, description="Name or role of reviewer"),
     db: Session = Depends(get_db),
 ) -> ExtractedKnowledgeResponse:
     """Approve claim and promote to active project knowledge."""
@@ -74,7 +74,7 @@ def approve_review(
 )
 def reject_review(
     review_id: UUID,
-    actor: Optional[str] = Query(None, description="Name or role of reviewer"),
+    actor: Optional[str] = Query(None, max_length=120, description="Name or role of reviewer"),
     db: Session = Depends(get_db),
 ) -> ExtractedKnowledgeResponse:
     """Reject claim from project knowledge base."""
@@ -90,7 +90,7 @@ def reject_review(
 def update_review(
     review_id: UUID,
     update_data: ExtractedKnowledgeUpdate,
-    actor: Optional[str] = Query(None, description="Name or role of editor"),
+    actor: Optional[str] = Query(None, max_length=120, description="Name or role of editor"),
     db: Session = Depends(get_db),
 ) -> ExtractedKnowledgeResponse:
     """Update title, content, owner or category of an extracted claim before approval."""
@@ -107,7 +107,7 @@ def update_review(
 def approve_all_reviews(
     project_id: Optional[UUID] = Query(None, description="Project ID filter"),
     document_id: Optional[UUID] = Query(None, description="Document ID filter"),
-    actor: Optional[str] = Query(None, description="Reviewer actor"),
+    actor: Optional[str] = Query(None, max_length=120, description="Reviewer actor"),
     db: Session = Depends(get_db),
 ) -> dict:
     """Approve all pending claims in batch."""

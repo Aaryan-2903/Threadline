@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -5,6 +6,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.document import DocumentResponse
 from app.services.document_service import DocumentService
+from app.services.extraction_service import _sanitize_error_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -18,7 +22,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 async def upload_document(
     file: UploadFile = File(...),
     project_id: Optional[UUID] = Form(None),
-    author: Optional[str] = Form(None),
+    author: Optional[str] = Form(None, max_length=120),
     db: Session = Depends(get_db),
 ) -> DocumentResponse:
     """Upload PDF or DOCX file, extract text and citations, run AI knowledge extraction."""
@@ -27,8 +31,26 @@ async def upload_document(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No filename provided in upload.",
         )
+    if len(file.filename) > 255:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Filename cannot exceed 255 characters.",
+        )
 
-    content = await file.read()
+    try:
+        content = await file.read()
+    except Exception as e:
+        logger.error(
+            "Failed to read uploaded file payload [filename=%s, error_type=%s]: %s",
+            file.filename,
+            type(e).__name__,
+            _sanitize_error_message(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to read uploaded file data.",
+        )
     return DocumentService.upload_and_process(
         db=db,
         filename=file.filename,

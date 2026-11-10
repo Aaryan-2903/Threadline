@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigation } from '../../context/useNavigation';
+import { useUserProfile } from '../../context/useUserProfile';
 
 export const TopHeader: React.FC = () => {
   const { currentScreen, selectedProjectId, navigate, searchQuery, setSearchQuery } = useNavigation();
+  const { profile, initials } = useUserProfile();
 
   // Dynamic breadcrumbs based on active screen
   const getBreadcrumbs = () => {
@@ -20,7 +22,7 @@ export const TopHeader: React.FC = () => {
       case 'project-workspace':
         return [
           { label: 'Projects', onClick: () => navigate('my-projects') },
-          { label: selectedProjectId === 'INF-109' ? 'Nexus Infrastructure Migration' : selectedProjectId, active: true },
+          { label: selectedProjectId || 'Project Workspace', active: true },
         ];
       case 'my-tasks':
         return [
@@ -140,9 +142,13 @@ export const TopHeader: React.FC = () => {
           <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full"></span>
         </button>
 
-        {/* Avatar */}
-        <div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0 ml-1 cursor-pointer">
-          ER
+        {/* Avatar / Profile Trigger */}
+        <div
+          onClick={() => navigate('settings')}
+          className="w-7 h-7 rounded-full bg-primary hover:bg-primary-container text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0 ml-1 cursor-pointer transition-colors shadow-xs"
+          title={`Profile settings (${profile.displayName || 'User'})`}
+        >
+          {initials}
         </div>
       </div>
     </header>

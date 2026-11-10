@@ -101,7 +101,7 @@ def update_decision(
 )
 def delete_decision(
     decision_id: UUID,
-    actor: Optional[str] = Query(None, description="Actor deleting the decision"),
+    actor: Optional[str] = Query(None, max_length=120, description="Actor deleting the decision"),
     db: Session = Depends(get_db),
 ) -> Response:
     """Delete a decision by ID."""

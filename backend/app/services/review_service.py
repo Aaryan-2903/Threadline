@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -17,16 +17,18 @@ class ReviewService:
     def list_reviews(
         cls,
         db: Session,
-        project_id: Optional[UUID] = None,
-        document_id: Optional[UUID] = None,
+        project_id: Optional[Union[UUID, str]] = None,
+        document_id: Optional[Union[UUID, str]] = None,
         verification_status: Optional[str] = None,
         category: Optional[str] = None,
     ) -> List[ExtractedKnowledge]:
         query = db.query(ExtractedKnowledge)
         if project_id:
-            query = query.filter(ExtractedKnowledge.project_id == project_id)
+            pid = UUID(str(project_id)) if not isinstance(project_id, UUID) else project_id
+            query = query.filter(ExtractedKnowledge.project_id == pid)
         if document_id:
-            query = query.filter(ExtractedKnowledge.document_id == document_id)
+            did = UUID(str(document_id)) if not isinstance(document_id, UUID) else document_id
+            query = query.filter(ExtractedKnowledge.document_id == did)
         if verification_status:
             query = query.filter(ExtractedKnowledge.status == verification_status)
         if category:
@@ -44,10 +46,10 @@ class ReviewService:
         return item
 
     @classmethod
-    def approve_review(
-        cls, db: Session, review_id: UUID, actor: Optional[str] = "Reviewer"
-    ) -> ExtractedKnowledge:
-        claim = cls.get_review(db, review_id)
+    def _promote_and_approve_claim(
+        cls, db: Session, claim: ExtractedKnowledge, actor: Optional[str] = "Reviewer"
+    ) -> None:
+        """Promote an extracted claim to Decision or Task table and record activity in the current transaction."""
         claim.status = VerificationStatus.APPROVED
 
         # If claim is decision and project_id exists, promote to Decisions table
@@ -84,6 +86,17 @@ class ReviewService:
                 entity_id=claim.id,
             )
 
+    @classmethod
+    def approve_review(
+        cls, db: Session, review_id: UUID, actor: Optional[str] = "Reviewer"
+    ) -> ExtractedKnowledge:
+        claim = cls.get_review(db, review_id)
+
+        # Idempotency guard: If already approved, return existing claim without creating duplicate records or activities
+        if claim.status == VerificationStatus.APPROVED:
+            return claim
+
+        cls._promote_and_approve_claim(db=db, claim=claim, actor=actor)
         db.commit()
         db.refresh(claim)
         return claim
@@ -93,6 +106,11 @@ class ReviewService:
         cls, db: Session, review_id: UUID, actor: Optional[str] = "Reviewer"
     ) -> ExtractedKnowledge:
         claim = cls.get_review(db, review_id)
+
+        # Idempotency guard: If already rejected, return without duplicate activities
+        if claim.status == VerificationStatus.REJECTED:
+            return claim
+
         claim.status = VerificationStatus.REJECTED
 
         if claim.project_id:
@@ -143,23 +161,34 @@ class ReviewService:
     def approve_all(
         cls,
         db: Session,
-        project_id: Optional[UUID] = None,
-        document_id: Optional[UUID] = None,
+        project_id: Optional[Union[UUID, str]] = None,
+        document_id: Optional[Union[UUID, str]] = None,
         actor: Optional[str] = "Reviewer",
     ) -> int:
+        """Batch approve all pending claims in a single atomic transaction. Rolls back completely on failure."""
         query = db.query(ExtractedKnowledge).filter(
             ExtractedKnowledge.status == VerificationStatus.PENDING
         )
         if project_id:
-            query = query.filter(ExtractedKnowledge.project_id == project_id)
+            pid = UUID(str(project_id)) if not isinstance(project_id, UUID) else project_id
+            query = query.filter(ExtractedKnowledge.project_id == pid)
         if document_id:
-            query = query.filter(ExtractedKnowledge.document_id == document_id)
+            did = UUID(str(document_id)) if not isinstance(document_id, UUID) else document_id
+            query = query.filter(ExtractedKnowledge.document_id == did)
 
         pending_items = query.all()
-        count = 0
-        for item in pending_items:
-            cls.approve_review(db, item.id, actor=actor)
-            count += 1
+        if not pending_items:
+            return 0
 
-        return count
+        try:
+            count = 0
+            for item in pending_items:
+                cls._promote_and_approve_claim(db=db, claim=item, actor=actor)
+                count += 1
+
+            db.commit()
+            return count
+        except Exception:
+            db.rollback()
+            raise
 

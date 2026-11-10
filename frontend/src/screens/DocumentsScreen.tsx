@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
+import { useUserProfile } from '../context/useUserProfile';
+import { isValidUUID } from '../utils/uuid';
 import type { DocumentItem, Project } from '../types';
 
 export const DocumentsScreen: React.FC = () => {
   const { navigate, selectedProjectId } = useNavigation();
+  const { profile } = useUserProfile();
+
+  const validProjectId = isValidUUID(selectedProjectId) ? selectedProjectId : undefined;
 
   // State
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -19,6 +24,8 @@ export const DocumentsScreen: React.FC = () => {
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [formatFilter, setFormatFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [approvedClaimsCount, setApprovedClaimsCount] = useState<number>(0);
+  const [totalReviewedClaims, setTotalReviewedClaims] = useState<number>(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,64 +35,27 @@ export const DocumentsScreen: React.FC = () => {
 
     const loadData = async () => {
       try {
-        const [docsData, projsData] = await Promise.all([
-          api.getDocuments(selectedProjectId || undefined),
+        const [docsData, projsData, reviewsData] = await Promise.all([
+          api.getDocuments(validProjectId),
           api.getProjects(),
+          api.getReviews({ project_id: validProjectId }),
         ]);
 
         if (!isMounted) return;
+        setProjects(projsData || []);
 
         if (docsData && docsData.length > 0) {
           setDocuments(docsData);
           setSelectedDocId((prev) => prev || docsData[0].id);
         } else {
-          // Fallback demo documents matching Stitch design when DB is freshly initialized
-          const sampleDocs: DocumentItem[] = [
-            {
-              id: 'doc-demo-1',
-              filename: 'RFC-109-kraft-consensus.pdf',
-              file_type: 'pdf',
-              file_size: 4404019, // 4.2 MB
-              author: 'Elena Rostova',
-              status: 'extracted',
-              extracted_claims_count: 18,
-              page_count: 28,
-              created_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-              project_name: 'Nexus Infrastructure Migration',
-            },
-            {
-              id: 'doc-demo-2',
-              filename: 'SCIM-Enterprise-v2-Spec.docx',
-              file_type: 'docx',
-              file_size: 2936012, // 2.8 MB
-              author: 'Sarah Walker',
-              status: 'extracted',
-              extracted_claims_count: 12,
-              page_count: 14,
-              created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-              project_name: 'Enterprise RBAC',
-            },
-            {
-              id: 'doc-demo-3',
-              filename: 'Stripe-Idempotency-Failure-Runbook.pdf',
-              file_type: 'pdf',
-              file_size: 1153433, // 1.1 MB
-              author: 'David Lin',
-              status: 'extracted',
-              extracted_claims_count: 9,
-              page_count: 6,
-              created_at: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(),
-              project_name: 'Checkout Service v2',
-            },
-          ];
-          setDocuments(sampleDocs);
-          setSelectedDocId((prev) => prev || sampleDocs[0].id);
+          setDocuments([]);
+          setSelectedDocId(null);
         }
 
-        setProjects(projsData);
+        const approved = (reviewsData || []).filter((r) => r.status === 'approved').length;
+        const reviewed = (reviewsData || []).filter((r) => r.status === 'approved' || r.status === 'rejected').length;
+        setApprovedClaimsCount(approved);
+        setTotalReviewedClaims(reviewed);
       } catch (err) {
         console.warn('Error loading documents:', err);
       }
@@ -96,18 +66,23 @@ export const DocumentsScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedProjectId]);
+  }, [validProjectId]);
 
   const refreshDocuments = async () => {
     try {
-      const [docsData, projsData] = await Promise.all([
-        api.getDocuments(selectedProjectId || undefined),
+      const [docsData, projsData, reviewsData] = await Promise.all([
+        api.getDocuments(validProjectId),
         api.getProjects(),
+        api.getReviews({ project_id: validProjectId }),
       ]);
       if (docsData && docsData.length > 0) {
         setDocuments(docsData);
       }
       setProjects(projsData);
+      const approved = (reviewsData || []).filter((r) => r.status === 'approved').length;
+      const reviewed = (reviewsData || []).filter((r) => r.status === 'approved' || r.status === 'rejected').length;
+      setApprovedClaimsCount(approved);
+      setTotalReviewedClaims(reviewed);
     } catch (err) {
       console.warn('Refresh error:', err);
     }
@@ -131,8 +106,8 @@ export const DocumentsScreen: React.FC = () => {
 
     setIsUploading(true);
     try {
-      const activeProjId = selectedProjectId || (projects.length > 0 ? projects[0].id : undefined);
-      const newDoc = await api.uploadDocument(file, activeProjId, 'Current User');
+      const activeProjId = validProjectId || (projects.length > 0 ? projects[0].id : undefined);
+      const newDoc = await api.uploadDocument(file, activeProjId, profile.displayName || 'User');
       setDocuments((prev) => [newDoc, ...prev]);
       setSelectedDocId(newDoc.id);
     } catch (err: any) {
@@ -390,18 +365,18 @@ export const DocumentsScreen: React.FC = () => {
 
           <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex flex-col justify-between">
             <div className="flex items-center justify-between text-on-surface-variant">
-              <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold">Extraction Accuracy</span>
-              <span className="material-symbols-outlined text-[18px] text-tertiary-container">verified_user</span>
+              <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold">Approved Claims</span>
+              <span className="material-symbols-outlined text-[18px] text-primary">verified_user</span>
             </div>
             <div className="mt-space-sm flex items-baseline gap-2">
-              <span className="font-headline-xl text-headline-xl text-on-surface font-semibold tracking-tight">99.4%</span>
+              <span className="font-headline-xl text-headline-xl text-on-surface font-semibold tracking-tight">{approvedClaimsCount}</span>
               <span className="font-label-sm text-label-sm text-secondary-container bg-surface-container px-1 rounded text-on-surface font-medium">
-                Pydantic validated
+                Human verified
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between text-[11px] text-on-surface-variant font-label-sm">
-              <span>Zero-hallucination citations</span>
-              <span className="text-tertiary font-medium">Verified source anchor</span>
+              <span>{totalReviewedClaims} reviewed across specifications</span>
+              <span className="text-tertiary font-medium">Review Queue</span>
             </div>
           </div>
         </div>
@@ -650,7 +625,7 @@ export const DocumentsScreen: React.FC = () => {
                   <div>
                     <span className="font-label-sm text-label-sm text-on-surface-variant block">Author</span>
                     <span className="font-label-md text-label-md text-on-surface font-medium truncate block">
-                      {selectedDoc.author || 'Elena Rostova'}
+                      {selectedDoc.author || profile.displayName || 'User'}
                     </span>
                   </div>
                   <div>

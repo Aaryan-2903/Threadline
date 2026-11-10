@@ -1,6 +1,22 @@
-import type { Project, Task, Decision, Activity, TaskStatus, TaskPriority, DocumentItem, ExtractedClaim } from '../types';
+import type {
+  Project,
+  Task,
+  Decision,
+  Activity,
+  TaskStatus,
+  TaskPriority,
+  DocumentItem,
+  ExtractedClaim,
+  ContinuityGraphData,
+  NodeDetail,
+  HandoverReport,
+} from '../types';
+import { isValidUUID } from '../utils/uuid';
 
-const API_BASE = '/api/v1';
+const VITE_API_URL = import.meta.env.VITE_API_URL;
+const API_BASE = VITE_API_URL
+  ? `${VITE_API_URL.replace(/\/$/, '')}/api/v1`
+  : '/api/v1';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -36,6 +52,7 @@ export const api = {
   },
 
   async getProject(id: string): Promise<Project | null> {
+    if (!isValidUUID(id)) return null;
     try {
       return await fetchJson<Project>(`${API_BASE}/projects/${id}`);
     } catch {
@@ -67,7 +84,9 @@ export const api = {
   async getTasks(params?: { project_id?: string; status?: TaskStatus; priority?: TaskPriority }): Promise<Task[]> {
     try {
       const searchParams = new URLSearchParams();
-      if (params?.project_id) searchParams.append('project_id', params.project_id);
+      if (params?.project_id && isValidUUID(params.project_id)) {
+        searchParams.append('project_id', params.project_id);
+      }
       if (params?.status) searchParams.append('status', params.status);
       if (params?.priority) searchParams.append('priority', params.priority);
       const query = searchParams.toString();
@@ -80,6 +99,7 @@ export const api = {
   },
 
   async getProjectTasks(projectId: string, params?: { status?: TaskStatus; priority?: TaskPriority }): Promise<Task[]> {
+    if (!isValidUUID(projectId)) return [];
     try {
       const searchParams = new URLSearchParams();
       if (params?.status) searchParams.append('status', params.status);
@@ -94,6 +114,7 @@ export const api = {
   },
 
   async getTask(id: string): Promise<Task | null> {
+    if (!isValidUUID(id)) return null;
     try {
       return await fetchJson<Task>(`${API_BASE}/tasks/${id}`);
     } catch {
@@ -146,7 +167,9 @@ export const api = {
   async getDecisions(params?: { project_id?: string }): Promise<Decision[]> {
     try {
       const searchParams = new URLSearchParams();
-      if (params?.project_id) searchParams.append('project_id', params.project_id);
+      if (params?.project_id && isValidUUID(params.project_id)) {
+        searchParams.append('project_id', params.project_id);
+      }
       const query = searchParams.toString();
       const url = query ? `${API_BASE}/decisions?${query}` : `${API_BASE}/decisions`;
       return await fetchJson<Decision[]>(url);
@@ -157,6 +180,7 @@ export const api = {
   },
 
   async getProjectDecisions(projectId: string): Promise<Decision[]> {
+    if (!isValidUUID(projectId)) return [];
     try {
       return await fetchJson<Decision[]>(`${API_BASE}/projects/${projectId}/decisions`);
     } catch (e) {
@@ -166,6 +190,7 @@ export const api = {
   },
 
   async getDecision(id: string): Promise<Decision | null> {
+    if (!isValidUUID(id)) return null;
     try {
       return await fetchJson<Decision>(`${API_BASE}/decisions/${id}`);
     } catch {
@@ -216,7 +241,9 @@ export const api = {
   async getActivities(params?: { project_id?: string; order?: 'asc' | 'desc'; limit?: number }): Promise<Activity[]> {
     try {
       const searchParams = new URLSearchParams();
-      if (params?.project_id) searchParams.append('project_id', params.project_id);
+      if (params?.project_id && isValidUUID(params.project_id)) {
+        searchParams.append('project_id', params.project_id);
+      }
       if (params?.order) searchParams.append('order', params.order);
       if (params?.limit) searchParams.append('limit', String(params.limit));
       const query = searchParams.toString();
@@ -229,6 +256,7 @@ export const api = {
   },
 
   async getProjectActivities(projectId: string, params?: { order?: 'asc' | 'desc'; limit?: number }): Promise<Activity[]> {
+    if (!isValidUUID(projectId)) return [];
     try {
       const searchParams = new URLSearchParams();
       if (params?.order) searchParams.append('order', params.order);
@@ -246,7 +274,7 @@ export const api = {
   async uploadDocument(file: File, projectId?: string, author?: string): Promise<DocumentItem> {
     const formData = new FormData();
     formData.append('file', file);
-    if (projectId) formData.append('project_id', projectId);
+    if (projectId && isValidUUID(projectId)) formData.append('project_id', projectId);
     if (author) formData.append('author', author);
 
     const response = await fetch(`${API_BASE}/documents/upload`, {
@@ -264,7 +292,9 @@ export const api = {
 
   async getDocuments(projectId?: string): Promise<DocumentItem[]> {
     try {
-      const url = projectId ? `${API_BASE}/documents?project_id=${projectId}` : `${API_BASE}/documents`;
+      const url = projectId && isValidUUID(projectId)
+        ? `${API_BASE}/documents?project_id=${projectId}`
+        : `${API_BASE}/documents`;
       return await fetchJson<DocumentItem[]>(url);
     } catch (e) {
       console.warn('Failed to fetch documents from API:', e);
@@ -273,6 +303,7 @@ export const api = {
   },
 
   async getDocument(id: string): Promise<DocumentItem | null> {
+    if (!isValidUUID(id)) return null;
     try {
       return await fetchJson<DocumentItem>(`${API_BASE}/documents/${id}`);
     } catch {
@@ -301,8 +332,12 @@ export const api = {
   }): Promise<ExtractedClaim[]> {
     try {
       const searchParams = new URLSearchParams();
-      if (params?.project_id) searchParams.append('project_id', params.project_id);
-      if (params?.document_id) searchParams.append('document_id', params.document_id);
+      if (params?.project_id && isValidUUID(params.project_id)) {
+        searchParams.append('project_id', params.project_id);
+      }
+      if (params?.document_id && isValidUUID(params.document_id)) {
+        searchParams.append('document_id', params.document_id);
+      }
       if (params?.status) searchParams.append('status', params.status);
       if (params?.category) searchParams.append('category', params.category);
       const query = searchParams.toString();
@@ -315,6 +350,7 @@ export const api = {
   },
 
   async getReview(id: string): Promise<ExtractedClaim | null> {
+    if (!isValidUUID(id)) return null;
     try {
       return await fetchJson<ExtractedClaim>(`${API_BASE}/reviews/${id}`);
     } catch {
@@ -350,8 +386,12 @@ export const api = {
     actor?: string;
   }): Promise<{ message: string; approved_count: number }> {
     const searchParams = new URLSearchParams();
-    if (params?.project_id) searchParams.append('project_id', params.project_id);
-    if (params?.document_id) searchParams.append('document_id', params.document_id);
+    if (params?.project_id && isValidUUID(params.project_id)) {
+      searchParams.append('project_id', params.project_id);
+    }
+    if (params?.document_id && isValidUUID(params.document_id)) {
+      searchParams.append('document_id', params.document_id);
+    }
     if (params?.actor) searchParams.append('actor', params.actor);
     const query = searchParams.toString();
     const url = query ? `${API_BASE}/reviews/approve-all?${query}` : `${API_BASE}/reviews/approve-all`;
@@ -359,6 +399,95 @@ export const api = {
       method: 'POST',
     });
   },
+
+  // Continuity Map
+  async getContinuityGraph(projectId: string): Promise<ContinuityGraphData> {
+    if (!isValidUUID(projectId)) {
+      return {
+        project_id: projectId,
+        project_name: '',
+        nodes: [],
+        edges: [],
+        entity_counts: {
+          decisions: 0,
+          tasks: 0,
+          risks: 0,
+          documents: 0,
+          owners: 0,
+          questions: 0,
+          conflicts: 0,
+        },
+        orphan_count: 0,
+        blocking_paths_count: 0,
+      };
+    }
+    return fetchJson<ContinuityGraphData>(`${API_BASE}/continuity/graph?project_id=${projectId}`);
+  },
+
+  async getContinuityNodeDetail(projectId: string, nodeId: string): Promise<NodeDetail | null> {
+    if (!isValidUUID(projectId)) return null;
+    try {
+      return await fetchJson<NodeDetail>(`${API_BASE}/continuity/nodes/${nodeId}?project_id=${projectId}`);
+    } catch {
+      return null;
+    }
+  },
+
+  // Handover Reports
+  async generateHandoverReport(
+    projectId: string,
+    actor?: string,
+    incomingOwner?: string,
+    incomingOwnerRole?: string
+  ): Promise<HandoverReport> {
+    if (!isValidUUID(projectId)) {
+      throw new Error(`Invalid project ID: "${projectId}". A valid UUID is required.`);
+    }
+    const searchParams = new URLSearchParams();
+    searchParams.append('project_id', projectId);
+    if (actor) searchParams.append('actor', actor);
+    if (incomingOwner) searchParams.append('incoming_owner', incomingOwner);
+    if (incomingOwnerRole) searchParams.append('incoming_owner_role', incomingOwnerRole);
+    return fetchJson<HandoverReport>(`${API_BASE}/reports/generate?${searchParams.toString()}`, {
+      method: 'POST',
+    });
+  },
+
+  async updateReportSuccessor(
+    reportId: string,
+    data: { incoming_owner?: string; incoming_owner_role?: string }
+  ): Promise<HandoverReport> {
+    if (!isValidUUID(reportId)) {
+      throw new Error(`Invalid report ID: "${reportId}". A valid UUID is required.`);
+    }
+    return fetchJson<HandoverReport>(`${API_BASE}/reports/${reportId}/successor`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getHandoverReports(projectId?: string): Promise<HandoverReport[]> {
+    try {
+      const url = projectId && isValidUUID(projectId)
+        ? `${API_BASE}/reports?project_id=${projectId}`
+        : `${API_BASE}/reports`;
+      return await fetchJson<HandoverReport[]>(url);
+    } catch (e) {
+      console.warn('Failed to fetch handover reports:', e);
+      return [];
+    }
+  },
+
+  async getHandoverReport(reportId: string): Promise<HandoverReport | null> {
+    if (!isValidUUID(reportId)) return null;
+    try {
+      return await fetchJson<HandoverReport>(`${API_BASE}/reports/${reportId}`);
+    } catch {
+      return null;
+    }
+  },
+
+  getHandoverReportPdfUrl(reportId: string): string {
+    return `${API_BASE}/reports/${reportId}/pdf`;
+  },
 };
-
-

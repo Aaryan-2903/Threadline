@@ -14,12 +14,17 @@ def record_activity(
     entity_id: Optional[UUID] = None,
 ) -> Activity:
     """Record an activity event for a project within the current database transaction."""
+    safe_description = description[:2000] if description else ""
+    safe_actor = (actor or "system")[:120]
+    safe_event_type = event_type[:50] if event_type else "event"
+    safe_entity_type = entity_type[:50] if entity_type else None
+
     activity = Activity(
         project_id=project_id,
-        event_type=event_type,
-        description=description,
-        actor=actor or "system",
-        entity_type=entity_type,
+        event_type=safe_event_type,
+        description=safe_description,
+        actor=safe_actor,
+        entity_type=safe_entity_type,
         entity_id=entity_id,
     )
     db.add(activity)

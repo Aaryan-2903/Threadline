@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavigationProvider } from './context/NavigationContext';
+import { UserProfileProvider } from './context/UserProfileContext';
 import { useNavigation } from './context/useNavigation';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewScreen } from './screens/OverviewScreen';
@@ -10,6 +11,9 @@ import { DecisionsScreen } from './screens/DecisionsScreen';
 import { ActivityTimelineScreen } from './screens/ActivityTimelineScreen';
 import { DocumentsScreen } from './screens/DocumentsScreen';
 import { AIReviewQueueScreen } from './screens/AIReviewQueueScreen';
+import { ContinuityMapScreen } from './screens/ContinuityMapScreen';
+import { HandoverReportsScreen } from './screens/HandoverReportsScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 
 const MainRouter: React.FC = () => {
@@ -32,33 +36,13 @@ const MainRouter: React.FC = () => {
     case 'documents':
       return <DocumentsScreen />;
     case 'handover-reports':
-      return (
-        <PlaceholderScreen
-          title="Handover Reports"
-          badge="Audit Ready"
-          subtitle="Compiled knowledge continuity reports, executive briefings, and signed-off succession dossiers."
-          icon="assignment_turned_in"
-        />
-      );
+      return <HandoverReportsScreen />;
     case 'ai-review-queue':
       return <AIReviewQueueScreen />;
     case 'continuity-map':
-      return (
-        <PlaceholderScreen
-          title="Continuity Map"
-          badge="v2.4 topology"
-          subtitle="Visual dependency graph mapping enterprise decisions, open handovers, risk blast radii, and owner relays."
-          icon="hub"
-        />
-      );
+      return <ContinuityMapScreen />;
     case 'settings':
-      return (
-        <PlaceholderScreen
-          title="Workspace Settings"
-          subtitle="Configure organization integrations, AI models, and audit log policies."
-          icon="settings"
-        />
-      );
+      return <SettingsScreen />;
     case 'help-docs':
       return (
         <PlaceholderScreen
@@ -74,11 +58,13 @@ const MainRouter: React.FC = () => {
 
 export function App() {
   return (
-    <NavigationProvider>
-      <AppShell>
-        <MainRouter />
-      </AppShell>
-    </NavigationProvider>
+    <UserProfileProvider>
+      <NavigationProvider>
+        <AppShell>
+          <MainRouter />
+        </AppShell>
+      </NavigationProvider>
+    </UserProfileProvider>
   );
 }
 

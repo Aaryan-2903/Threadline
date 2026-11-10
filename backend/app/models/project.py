@@ -39,6 +39,7 @@ class Project(Base):
     activities = relationship("Activity", back_populates="project", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="project", cascade="all, delete-orphan")
     extracted_knowledge = relationship("ExtractedKnowledge", back_populates="project", cascade="all, delete-orphan")
+    reports = relationship("HandoverReport", back_populates="project", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Project(id={self.id}, name={self.name}, status={self.status})>"

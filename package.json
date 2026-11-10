@@ -1,0 +1,18 @@
+{
+  "name": "threadline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Threadline — AI-powered project knowledge handover platform",
+  "scripts": {
+    "dev": "concurrently -k -n \"backend,frontend\" -c \"blue.bold,magenta.bold\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "node scripts/start-backend.js",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "test:backend": "node scripts/test-backend.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
+

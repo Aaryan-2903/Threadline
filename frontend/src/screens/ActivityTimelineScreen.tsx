@@ -35,87 +35,14 @@ export const ActivityTimelineScreen: React.FC = () => {
         ]);
 
         if (!isMounted) return;
-        setProjects(fetchedProjects);
+        setProjects(fetchedProjects || []);
 
-        if (fetchedActivities.length > 0) {
+        if (fetchedActivities && fetchedActivities.length > 0) {
           setActivities(fetchedActivities);
           setSelectedActivityId(prev => prev || fetchedActivities[0].id);
         } else {
-          // Fallback demo activities matching Stitch specification if backend has 0 activity logs
-          const demoActivities: Activity[] = [
-            {
-              id: 'act-001',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'decision_created',
-              description: 'Elena Rostova ratified ADR-042: KRaft consensus mode migration. Eliminates external Apache ZooKeeper topology.',
-              actor: 'Elena Rostova',
-              entity_type: 'decision',
-              entity_id: 'adr-042',
-              timestamp: new Date(currentTimestamp - 2 * 3600000).toISOString(),
-            },
-            {
-              id: 'act-002',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'task_status_changed',
-              description: 'Marcus Vance marked TASK-904 as Blocked: VPC peering packet loss under 50k req/s load test.',
-              actor: 'Marcus Vance',
-              entity_type: 'task',
-              entity_id: 'task-904',
-              timestamp: new Date(currentTimestamp - 3.5 * 3600000).toISOString(),
-            },
-            {
-              id: 'act-003',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'ai_extraction',
-              description: 'AI Continuity Engine extracted 4 decisions and 2 open questions from RFC-109-kraft-consensus.pdf',
-              actor: 'Automated Pipeline',
-              entity_type: 'document',
-              entity_id: 'doc-rfc-109',
-              timestamp: new Date(currentTimestamp - 5.5 * 3600000).toISOString(),
-            },
-            {
-              id: 'act-004',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'handover_milestone',
-              description: 'Elena Rostova submitted Handover Draft to Marcus Vance (88% Transfer Completed)',
-              actor: 'Elena Rostova',
-              entity_type: 'project',
-              entity_id: fetchedProjects[0]?.id || 'p-nexus',
-              timestamp: new Date(currentTimestamp - 26 * 3600000).toISOString(),
-            },
-            {
-              id: 'act-005',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'task_status_changed',
-              description: 'David Lin marked Redis Sentinel failover testing as Completed',
-              actor: 'David Lin',
-              entity_type: 'task',
-              entity_id: 'task-882',
-              timestamp: new Date(currentTimestamp - 28 * 3600000).toISOString(),
-            },
-            {
-              id: 'act-006',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'document_ingested',
-              description: 'Sarah Walker uploaded SCIM-Enterprise-v2-Spec.docx for Okta and Azure AD sync',
-              actor: 'Sarah Walker',
-              entity_type: 'document',
-              entity_id: 'doc-scim',
-              timestamp: new Date(currentTimestamp - 30 * 3600000).toISOString(),
-            },
-            {
-              id: 'act-007',
-              project_id: fetchedProjects[0]?.id || 'p-nexus',
-              event_type: 'decision_created',
-              description: 'Soren Brandt created draft ADR-041: TLS 1.3 mTLS enforcement across microservice producers',
-              actor: 'Soren Brandt',
-              entity_type: 'decision',
-              entity_id: 'adr-041',
-              timestamp: new Date(currentTimestamp - 72 * 3600000).toISOString(),
-            },
-          ];
-          setActivities(demoActivities);
-          setSelectedActivityId(prev => prev || demoActivities[0].id);
+          setActivities([]);
+          setSelectedActivityId(null);
         }
       } catch (err) {
         console.error('Failed to load activities:', err);
@@ -466,7 +393,7 @@ export const ActivityTimelineScreen: React.FC = () => {
                       activity={act}
                       isSelected={selectedActivity?.id === act.id}
                       badge={getEventBadge(act.event_type, act.description)}
-                      projectName={projectMap.get(act.project_id)?.name || 'Nexus Migration'}
+                      projectName={projectMap.get(act.project_id)?.name || 'Project'}
                       onSelect={() => setSelectedActivityId(act.id)}
                       relativeTime={formatRelativeTime(act.timestamp)}
                     />
@@ -497,7 +424,7 @@ export const ActivityTimelineScreen: React.FC = () => {
                       activity={act}
                       isSelected={selectedActivity?.id === act.id}
                       badge={getEventBadge(act.event_type, act.description)}
-                      projectName={projectMap.get(act.project_id)?.name || 'Nexus Migration'}
+                      projectName={projectMap.get(act.project_id)?.name || 'Project'}
                       onSelect={() => setSelectedActivityId(act.id)}
                       relativeTime={formatRelativeTime(act.timestamp)}
                     />
@@ -528,7 +455,7 @@ export const ActivityTimelineScreen: React.FC = () => {
                       activity={act}
                       isSelected={selectedActivity?.id === act.id}
                       badge={getEventBadge(act.event_type, act.description)}
-                      projectName={projectMap.get(act.project_id)?.name || 'Nexus Migration'}
+                      projectName={projectMap.get(act.project_id)?.name || 'Project'}
                       onSelect={() => setSelectedActivityId(act.id)}
                       relativeTime={formatRelativeTime(act.timestamp)}
                     />
@@ -577,7 +504,7 @@ export const ActivityTimelineScreen: React.FC = () => {
                         {getEventBadge(selectedActivity.event_type, selectedActivity.description).label}
                       </span>
                       <span className="font-code-inline text-[11px] text-on-surface-variant font-medium">
-                        {projectMap.get(selectedActivity.project_id)?.name || 'Nexus Migration'}
+                        {projectMap.get(selectedActivity.project_id)?.name || 'Project'}
                       </span>
                     </div>
                     <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold leading-snug">
@@ -684,11 +611,6 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   onSelect,
   relativeTime,
 }) => {
-  const isDecision = activity.event_type.includes('decision');
-  const isBlocked = activity.description.toLowerCase().includes('blocked');
-  const isHandover = activity.description.toLowerCase().includes('handover');
-  const isAi = activity.event_type.includes('ai');
-
   return (
     <div
       onClick={onSelect}
@@ -711,7 +633,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
               {badge.label}
             </span>
             <span className="font-code-inline text-[11px] text-on-surface-variant font-medium">
-              {isDecision ? 'ADR-042' : 'EVENT'}
+              {activity.entity_type?.toUpperCase() || 'EVENT'}
             </span>
             <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
               {projectName}
@@ -727,75 +649,11 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
           {activity.description}
         </div>
 
-        {/* Collapsible Git Diff Snippet Container if decision */}
-        {isDecision && (
+        {/* Collapsible Git Diff Snippet Container if decision metadata contains diff */}
+        {Boolean(activity.metadata?.diff) && (
           <div className="mt-2 rounded bg-surface-container-low p-space-sm flex flex-col gap-1.5 border border-outline-variant/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[15px] text-secondary">commit</span>
-                <span className="font-code-inline text-[11px] text-on-surface font-semibold">commit #a8f912c</span>
-                <span className="font-label-sm text-[11px] text-on-surface-variant truncate">
-                  docs(arch): update consensus state diagrams
-                </span>
-              </div>
-              <span className="font-code-inline text-[11px] text-secondary font-medium">diff: +142 -38</span>
-            </div>
-            <div className="font-code-inline text-[11px] text-on-surface-variant bg-surface-container-lowest p-2 rounded leading-relaxed overflow-x-auto border border-outline-variant/20">
-              <div className="text-tertiary font-medium">+ process.roles=broker,controller</div>
-              <div className="text-tertiary font-medium">+ controller.quorum.voters=1@kafka1:9093,2@kafka2:9093</div>
-              <div className="text-error font-medium">- zookeeper.connect=zk1:2181,zk2:2181,zk3:2181</div>
-            </div>
-          </div>
-        )}
-
-        {/* Active Incident Callout if blocker */}
-        {isBlocked && (
-          <div className="mt-1 rounded bg-error-container/30 p-2 flex items-start gap-2 border border-error/20">
-            <span className="material-symbols-outlined text-[16px] text-error shrink-0 mt-0.5">report_problem</span>
-            <div className="font-body-sm text-body-sm text-on-surface">
-              <span className="font-semibold text-error">Active Incident #INC-302:</span> AWS transit gateway MTU mismatch escalated to AWS Enterprise TAM. Handover SLA paused until resolution.
-            </div>
-          </div>
-        )}
-
-        {/* AI extractions callout */}
-        {isAi && (
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-low font-label-sm text-[11px] text-on-surface border border-outline-variant/20">
-              <span className="material-symbols-outlined text-[14px] text-tertiary-container">verified</span>
-              <span>4 items dispatched to AI Review Queue</span>
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-low font-label-sm text-[11px] text-on-surface border border-outline-variant/20">
-              <span className="material-symbols-outlined text-[14px] text-secondary">description</span>
-              <span>RFC-109-kraft-consensus.pdf (4.2 MB)</span>
-            </div>
-          </div>
-        )}
-
-        {/* Handover Relay transition chip */}
-        {isHandover && (
-          <div className="mt-2 p-2.5 rounded bg-surface-container-low flex items-center justify-between max-w-md border border-outline-variant/15">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center text-[10px] font-bold">
-                ER
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-label-sm text-label-sm text-on-surface font-medium truncate">Elena Rostova</span>
-                <span className="font-label-sm text-[10px] text-on-surface-variant truncate">Outgoing Lead</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 text-on-surface-variant px-2 shrink-0">
-              <span className="material-symbols-outlined text-[16px]">arrow_right_alt</span>
-              <span className="font-code-inline text-[11px]">88%</span>
-            </div>
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-[10px] font-bold">
-                MV
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-label-sm text-label-sm text-on-surface font-medium truncate">Marcus Vance</span>
-                <span className="font-label-sm text-[10px] text-on-surface-variant truncate">Incoming Owner</span>
-              </div>
+            <div className="font-code-inline text-[11px] text-on-surface-variant bg-surface-container-lowest p-2 rounded leading-relaxed overflow-x-auto border border-outline-variant/20 whitespace-pre-wrap">
+              {String(activity.metadata?.diff)}
             </div>
           </div>
         )}
@@ -805,11 +663,11 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
           <div className="flex items-center gap-space-sm">
             <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
               <span className="font-label-sm text-[10px] text-on-primary font-bold">
-                {activity.actor?.slice(0, 2).toUpperCase() || 'ER'}
+                {activity.actor?.slice(0, 2).toUpperCase() || 'SY'}
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-on-surface-variant">
-              {activity.actor || 'Elena Rostova'}
+              {activity.actor || 'System'}
             </span>
           </div>
           {isSelected && (

@@ -64,6 +64,8 @@ export interface Activity {
   actor?: string;
   entity_type?: string;
   entity_id?: string;
+  metadata_json?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
   timestamp: string;
 }
 
@@ -107,6 +109,172 @@ export interface ExtractedClaim {
   document_name?: string;
 }
 
+export interface GraphNode {
+  id: string;
+  label: string;
+  entity_type: 'project' | 'document' | 'decision' | 'task' | 'owner' | 'risk' | 'question' | 'conflict';
+  status?: string;
+  subtitle?: string;
+  source_doc?: string;
+  evidence_quote?: string;
+  citation?: string;
+  owner?: string;
+  impact_scope?: string;
+  is_orphan?: boolean;
+  metadata?: Record<string, unknown>;
+  x?: number;
+  y?: number;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship: string;
+  inferred?: boolean;
+  status?: string;
+}
+
+export interface ContinuityGraphData {
+  project_id: string;
+  project_name: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  entity_counts: {
+    decisions: number;
+    tasks: number;
+    risks: number;
+    documents: number;
+    owners: number;
+    questions: number;
+    conflicts: number;
+  };
+  orphan_count: number;
+  blocking_paths_count: number;
+}
+
+export interface NodeDetail {
+  node: GraphNode;
+  connected_nodes: GraphNode[];
+  incoming_edges: GraphEdge[];
+  outgoing_edges: GraphEdge[];
+}
+
+export interface HandoverReportContent {
+  overview: {
+    project_id: string;
+    project_name: string;
+    description?: string;
+    generated_at: string;
+    project_status: string;
+    progress_percentage: number;
+    outgoing_owner: string;
+    incoming_owner: string;
+    incoming_owner_role?: string | null;
+    health_score: string;
+    executive_summary: string;
+  };
+  status: {
+    total_tasks: number;
+    completed_tasks: number;
+    pending_tasks: number;
+    blocked_tasks: number;
+    decisions_count: number;
+    risks_count: number;
+    documents_count: number;
+    approved_claims_count?: number;
+    rejected_claims_count?: number;
+    pending_claims_count?: number;
+  };
+  decisions: Array<{
+    id: string;
+    title: string;
+    rationale?: string;
+    decided_by?: string;
+    decision_date?: string;
+    source_reference?: string;
+    evidence_snippet?: string;
+    verified: boolean;
+  }>;
+  completed_work: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    assignee?: string;
+    due_date?: string;
+    description?: string;
+  }>;
+  pending_and_blocked_tasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    assignee?: string;
+    due_date?: string;
+    description?: string;
+    blocker_reason?: string;
+  }>;
+  ownership_matrix: Array<{
+    name: string;
+    role: string;
+    assigned_tasks_count: number;
+    decisions_signed_count: number;
+    handover_status: string;
+  }>;
+  risks_and_blockers: Array<{
+    id: string;
+    title: string;
+    impact_scope?: string;
+    severity: string;
+    evidence_snippet?: string;
+    source_reference?: string;
+    verified: boolean;
+  }>;
+  dependencies: Array<{
+    from_entity: string;
+    to_entity: string;
+    relationship_type: string;
+    is_inferred: boolean;
+  }>;
+  open_questions: Array<{
+    id: string;
+    title: string;
+    impact_scope?: string;
+    source_reference?: string;
+    evidence_snippet?: string;
+    verified: boolean;
+  }>;
+  recommended_next_actions: Array<{
+    action: string;
+    priority: string;
+    target_owner: string;
+    suggested_timeframe: string;
+    is_inferred: boolean;
+  }>;
+  source_documents: Array<{
+    id: string;
+    filename: string;
+    file_type: string;
+    file_size: number;
+    author?: string;
+    page_count: number;
+    extracted_claims_count: number;
+  }>;
+}
+
+export interface HandoverReport {
+  id: string;
+  project_id: string;
+  title: string;
+  summary?: string;
+  status: string;
+  generated_by?: string;
+  content: HandoverReportContent;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ScreenId =
   | 'overview'
   | 'my-projects'
@@ -120,4 +288,9 @@ export type ScreenId =
   | 'continuity-map'
   | 'settings'
   | 'help-docs';
+
+export interface UserProfile {
+  displayName: string;
+  role?: string;
+}
 

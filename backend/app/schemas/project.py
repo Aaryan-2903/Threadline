@@ -7,13 +7,13 @@ from app.models.project import ProjectStatus
 
 class ProjectBase(BaseModel):
     name: str = Field(..., max_length=120, description="Project name")
-    description: Optional[str] = Field(default=None, description="Project description")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Project description")
     status: ProjectStatus = Field(default=ProjectStatus.ACTIVE, description="Project status")
 
 
 class ProjectCreate(BaseModel):
     name: str = Field(..., max_length=120, description="Project name")
-    description: Optional[str] = Field(default=None, description="Project description")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Project description")
     status: ProjectStatus = Field(default=ProjectStatus.ACTIVE, description="Project status")
 
     @field_validator("name")
@@ -31,7 +31,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=120, description="Project name")
-    description: Optional[str] = Field(default=None, description="Project description")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Project description")
     status: Optional[ProjectStatus] = Field(default=None, description="Project status")
 
     @field_validator("name")

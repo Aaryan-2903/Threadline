@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class DecisionBase(BaseModel):
     title: str = Field(..., max_length=200, description="Decision title")
-    description: Optional[str] = Field(default=None, description="Decision description")
-    rationale: Optional[str] = Field(default=None, description="Rationale behind the decision")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Decision description")
+    rationale: Optional[str] = Field(default=None, max_length=10000, description="Rationale behind the decision")
     decided_by: Optional[str] = Field(default=None, max_length=120, description="Person or team who made the decision")
     decision_date: Optional[datetime] = Field(default=None, description="Date decision was taken")
 
@@ -15,8 +15,8 @@ class DecisionBase(BaseModel):
 class DecisionCreate(BaseModel):
     project_id: Optional[UUID] = Field(default=None, description="Project ID (if not provided in route path)")
     title: str = Field(..., max_length=200, description="Decision title")
-    description: Optional[str] = Field(default=None, description="Decision description")
-    rationale: Optional[str] = Field(default=None, description="Rationale behind the decision")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Decision description")
+    rationale: Optional[str] = Field(default=None, max_length=10000, description="Rationale behind the decision")
     decided_by: Optional[str] = Field(default=None, max_length=120, description="Person or team who made the decision")
     decision_date: Optional[datetime] = Field(default=None, description="Date decision was taken (defaults to current time)")
     actor: Optional[str] = Field(default=None, max_length=120, description="Actor recording the decision")
@@ -36,8 +36,8 @@ class DecisionCreate(BaseModel):
 
 class DecisionUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200, description="Decision title")
-    description: Optional[str] = Field(default=None, description="Decision description")
-    rationale: Optional[str] = Field(default=None, description="Rationale behind the decision")
+    description: Optional[str] = Field(default=None, max_length=10000, description="Decision description")
+    rationale: Optional[str] = Field(default=None, max_length=10000, description="Rationale behind the decision")
     decided_by: Optional[str] = Field(default=None, max_length=120, description="Person or team who made the decision")
     decision_date: Optional[datetime] = Field(default=None, description="Date decision was taken")
     actor: Optional[str] = Field(default=None, max_length=120, description="Actor performing update")

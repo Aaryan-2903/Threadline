@@ -106,7 +106,7 @@ def update_task(
 )
 def delete_task(
     task_id: UUID,
-    actor: Optional[str] = Query(None, description="Actor deleting the task"),
+    actor: Optional[str] = Query(None, max_length=120, description="Actor deleting the task"),
     db: Session = Depends(get_db),
 ) -> Response:
     """Delete a task by ID."""

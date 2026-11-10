@@ -6,16 +6,16 @@ from app.models.document import DocumentStatus
 
 
 class DocumentBase(BaseModel):
-    filename: str = Field(..., max_length=255)
-    file_type: str = Field(..., max_length=50)
+    filename: str = Field(..., min_length=1, max_length=255)
+    file_type: str = Field(..., min_length=1, max_length=50)
     file_size: int = Field(..., ge=0)
     author: Optional[str] = Field(default=None, max_length=120)
 
 
 class DocumentCreate(BaseModel):
     project_id: Optional[UUID] = None
-    filename: str = Field(..., max_length=255)
-    file_type: str = Field(..., max_length=50)
+    filename: str = Field(..., min_length=1, max_length=255)
+    file_type: str = Field(..., min_length=1, max_length=50)
     file_size: int = Field(..., ge=0)
     author: Optional[str] = Field(default=None, max_length=120)
 

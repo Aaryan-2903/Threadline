@@ -167,3 +167,47 @@ def test_delete_decision_not_found(client):
     response = client.delete(f"/api/v1/decisions/{bad_id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
+def test_create_decision_oversized_rationale_fails(client):
+    """
+    Regression test: Security Audit Fix 6.
+    Verify creating a decision with rationale > 10,000 chars returns 422.
+    """
+    project_id = _create_project(client)
+    response = client.post(
+        f"/api/v1/projects/{project_id}/decisions",
+        json={"title": "Decision With Huge Rationale", "rationale": "r" * 10001},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+def test_update_decision_oversized_rationale_fails(client):
+    """
+    Regression test: Security Audit Fix 6.
+    Verify updating a decision with rationale > 10,000 chars returns 422.
+    """
+    project_id = _create_project(client)
+    decision = client.post(
+        f"/api/v1/projects/{project_id}/decisions",
+        json={"title": "Decision To Update", "rationale": "normal"},
+    ).json()
+
+    patch_resp = client.patch(
+        f"/api/v1/decisions/{decision['id']}",
+        json={"rationale": "r" * 10001},
+    )
+    assert patch_resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+def test_create_decision_oversized_decided_by_fails(client):
+    """
+    Regression test: Security Audit Fix 6.
+    Verify creating a decision with decided_by > 120 chars returns 422.
+    """
+    project_id = _create_project(client)
+    response = client.post(
+        f"/api/v1/projects/{project_id}/decisions",
+        json={"title": "Decision With Long Decided By", "decided_by": "d" * 121},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+

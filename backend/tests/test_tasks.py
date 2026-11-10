@@ -210,3 +210,47 @@ def test_delete_task_not_found(client):
     response = client.delete(f"/api/v1/tasks/{bad_id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
+def test_create_task_oversized_description_fails(client):
+    """
+    Regression test: Security Audit Fix 6.
+    Verify creating a task with description > 10,000 chars returns 422.
+    """
+    proj = client.post("/api/v1/projects/", json={"name": "Task Proj"}).json()
+    response = client.post(
+        f"/api/v1/projects/{proj['id']}/tasks",
+        json={"title": "Valid Task", "description": "d" * 10001},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+def test_update_task_oversized_description_fails(client):
+    """
+    Regression test: Security Audit Fix 6.
+    Verify updating a task with description > 10,000 chars returns 422.
+    """
+    proj = client.post("/api/v1/projects/", json={"name": "Task Proj 2"}).json()
+    task = client.post(
+        f"/api/v1/projects/{proj['id']}/tasks",
+        json={"title": "Valid Task", "description": "Normal"},
+    ).json()
+
+    patch_resp = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"description": "u" * 10001},
+    )
+    assert patch_resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+def test_create_task_oversized_assignee_fails(client):
+    """
+    Regression test: Security Audit Fix 6.
+    Verify creating a task with assignee > 120 chars returns 422.
+    """
+    proj = client.post("/api/v1/projects/", json={"name": "Task Proj 3"}).json()
+    response = client.post(
+        f"/api/v1/projects/{proj['id']}/tasks",
+        json={"title": "Valid Task", "assignee": "a" * 121},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+

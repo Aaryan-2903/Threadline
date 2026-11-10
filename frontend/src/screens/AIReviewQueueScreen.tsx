@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
+import { useUserProfile } from '../context/useUserProfile';
+import { isValidUUID } from '../utils/uuid';
 import type { ExtractedClaim } from '../types';
 
 export const AIReviewQueueScreen: React.FC = () => {
-  const { selectedProjectId } = useNavigation();
+  const { selectedProjectId, navigate } = useNavigation();
+  const { profile } = useUserProfile();
+
+  const validProjectId = isValidUUID(selectedProjectId) ? selectedProjectId : undefined;
 
   // State
   const [claims, setClaims] = useState<ExtractedClaim[]>([]);
@@ -24,7 +29,7 @@ export const AIReviewQueueScreen: React.FC = () => {
     const loadReviews = async () => {
       try {
         const data = await api.getReviews({
-          project_id: selectedProjectId || undefined,
+          project_id: validProjectId,
         });
 
         if (!isMounted) return;
@@ -33,68 +38,8 @@ export const AIReviewQueueScreen: React.FC = () => {
           setClaims(data);
           setSelectedClaimId((prev) => prev || data[0].id);
         } else {
-          // Fallback demo claims matching Stitch design when no documents have been parsed yet
-          const sampleClaims: ExtractedClaim[] = [
-            {
-              id: 'claim-1',
-              document_id: 'doc-demo-1',
-              category: 'decision',
-              title: 'Migrate ZooKeeper ensemble to Kafka KRaft consensus mode',
-              content:
-                'The architecture committee agreed to deprecate external ZooKeeper instances in favor of native KRaft metadata controllers to reduce cold-start p99 latency to under 2s and eliminate quorum split-brain hazards.',
-              evidence_snippet:
-                '“...after extensive load benchmarking on us-east-1 staging clusters, the consensus of the engineering working group (Elena R., Marcus V.) is to decommission the legacy 3-node Apache ZooKeeper cluster and adopt native KRaft controllers starting with Kafka v3.6.0. This eliminates split-brain quorum failure hazards and reduces monthly infrastructure overhead by $2,840.”',
-              source_reference: 'RFC-109-kraft-consensus.pdf · Page 14, Section 3.2',
-              page_number: 14,
-              confidence: 0.98,
-              status: 'pending',
-              owner: 'Elena Rostova, Marcus Vance',
-              impact_scope: 'High (Core Infra)',
-              created_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-              document_name: 'RFC-109-kraft-consensus.pdf',
-            },
-            {
-              id: 'claim-2',
-              document_id: 'doc-demo-2',
-              category: 'task',
-              title: 'VPC Transit Gateway MTU packet drop under 50k req/s',
-              content:
-                'Identified MTU mismatch between K8s CNI (1500 MTU) and AWS Transit Gateway (8500 MTU jumbo frames disabled). Blocks handover cutover for production traffic.',
-              evidence_snippet:
-                '“Identified MTU mismatch between K8s CNI (1500 MTU) and AWS Transit Gateway (8500 MTU jumbo frames disabled). Blocks handover cutover for production traffic. Marcus Vance assigned to deploy jumbo frame support.”',
-              source_reference: 'Meeting Transcript: SRE Sync Oct 24 · Page 4',
-              page_number: 4,
-              confidence: 0.94,
-              status: 'pending',
-              owner: 'Marcus Vance (SRE)',
-              impact_scope: 'Network Stability',
-              created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-              document_name: 'SRE-Sync-Notes.docx',
-            },
-            {
-              id: 'claim-3',
-              document_id: 'doc-demo-3',
-              category: 'conflict',
-              title: 'Retention window conflict: 7 days vs 14 days',
-              content:
-                'RFC-109 specifies a 7-day Kafka topic retention window, but Runbook-v2 mandates 14-day compliance archive retention prior to cold tier tiering.',
-              evidence_snippet:
-                '“RFC-109 specifies a 7-day Kafka topic retention window, but Runbook-v2 mandates 14-day compliance archive retention prior to cold tier tiering. 2 Documents competing for authoritative status.”',
-              source_reference: 'Cross-Document Inconsistency · RFC-109 vs Runbook-v2',
-              page_number: 22,
-              confidence: 0.89,
-              status: 'pending',
-              owner: 'Sarah Walker',
-              impact_scope: 'Compliance & Audit',
-              created_at: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-              updated_at: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-              document_name: 'RFC-109-kraft-consensus.pdf',
-            },
-          ];
-          setClaims(sampleClaims);
-          setSelectedClaimId((prev) => prev || sampleClaims[0].id);
+          setClaims([]);
+          setSelectedClaimId(null);
         }
       } catch (err) {
         console.warn('Error fetching reviews:', err);
@@ -106,12 +51,12 @@ export const AIReviewQueueScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [selectedProjectId]);
+  }, [validProjectId]);
 
   const refreshReviews = async () => {
     try {
       const data = await api.getReviews({
-        project_id: selectedProjectId || undefined,
+        project_id: validProjectId,
       });
       if (data && data.length > 0) {
         setClaims(data);
@@ -125,7 +70,7 @@ export const AIReviewQueueScreen: React.FC = () => {
   const handleApprove = async (id: string) => {
     setIsProcessingAction(true);
     try {
-      await api.approveReview(id, 'Lead Reviewer');
+      await api.approveReview(id, profile.displayName || 'User');
       setClaims((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: 'approved' } : c))
       );
@@ -139,7 +84,7 @@ export const AIReviewQueueScreen: React.FC = () => {
   const handleReject = async (id: string) => {
     setIsProcessingAction(true);
     try {
-      await api.rejectReview(id, 'Lead Reviewer');
+      await api.rejectReview(id, profile.displayName || 'User');
       setClaims((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: 'rejected' } : c))
       );
@@ -154,8 +99,8 @@ export const AIReviewQueueScreen: React.FC = () => {
     setIsProcessingAction(true);
     try {
       await api.approveAllReviews({
-        project_id: selectedProjectId || undefined,
-        actor: 'Lead Reviewer',
+        project_id: validProjectId,
+        actor: profile.displayName || 'User',
       });
       setClaims((prev) =>
         prev.map((c) => (c.status === 'pending' ? { ...c, status: 'approved' } : c))
@@ -184,7 +129,7 @@ export const AIReviewQueueScreen: React.FC = () => {
           owner: editOwner,
           content: editContent,
         },
-        'Lead Reviewer'
+        profile.displayName || 'User'
       );
       setClaims((prev) => prev.map((c) => (c.id === editingClaim.id ? updated : c)));
       setEditingClaim(null);
@@ -467,10 +412,28 @@ export const AIReviewQueueScreen: React.FC = () => {
             </span>
           </div>
 
-          {filteredClaims.length === 0 ? (
-            <div className="w-full bg-surface-container-lowest rounded-xl p-12 text-center text-on-surface-variant shadow-sm">
+          {claims.length === 0 ? (
+            <div className="w-full bg-surface-container-lowest rounded-xl p-12 text-center text-on-surface-variant shadow-sm space-y-3 border border-surface-container">
+              <span className="material-symbols-outlined text-[42px] text-primary block mx-auto">psychology</span>
+              <div className="space-y-1">
+                <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">AI Review Queue is Empty</h3>
+                <p className="font-body-md text-sm text-on-surface-variant max-w-md mx-auto">
+                  Extracted knowledge claims will appear here after technical specifications (PDF/DOCX) are uploaded and processed.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('documents')}
+                className="inline-flex items-center gap-1.5 px-4 h-9 rounded bg-primary text-on-primary font-label-md text-label-md shadow-xs hover:bg-primary-container transition-colors cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">upload_file</span>
+                <span>Go to Documents Hub</span>
+              </button>
+            </div>
+          ) : filteredClaims.length === 0 ? (
+            <div className="w-full bg-surface-container-lowest rounded-xl p-12 text-center text-on-surface-variant shadow-sm border border-surface-container">
               <span className="material-symbols-outlined text-[36px] block mb-2 text-outline">fact_check</span>
-              No claims found in this category.
+              No claims found matching active filter.
             </div>
           ) : (
             filteredClaims.map((claim) => {
@@ -691,7 +654,7 @@ export const AIReviewQueueScreen: React.FC = () => {
                     <div className="bg-surface-container-lowest p-space-sm rounded shadow-sm flex flex-col">
                       <span className="font-label-sm text-label-sm text-on-surface-variant">Sign-off Decider</span>
                       <span className="font-label-md text-label-md font-semibold text-on-surface mt-0.5 truncate">
-                        {selectedClaim.owner || 'Elena Rostova'}
+                        {selectedClaim.owner || profile.displayName || 'User'}
                       </span>
                     </div>
                     <div className="bg-surface-container-lowest p-space-sm rounded shadow-sm flex flex-col">

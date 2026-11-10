@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { Decision, Project } from '../types';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
+import { useUserProfile } from '../context/useUserProfile';
 
 export const DecisionsScreen: React.FC = () => {
   const { navigateTo } = useNavigation();
+  const { profile } = useUserProfile();
 
   // State
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -14,7 +16,7 @@ export const DecisionsScreen: React.FC = () => {
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState<string>('KRaft');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -27,14 +29,14 @@ export const DecisionsScreen: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     projectId: '',
     title: '',
     description: '',
     rationale: '',
-    decidedBy: 'Elena Rostova & Marcus Vance',
-    decisionDate: '2025-10-08',
-  });
+    decidedBy: profile.displayName || 'User',
+    decisionDate: new Date().toISOString().slice(0, 10),
+  }));
 
   // Load projects and decisions
   useEffect(() => {
@@ -49,75 +51,12 @@ export const DecisionsScreen: React.FC = () => {
         ]);
 
         if (!isMounted) return;
-        setProjects(fetchedProjects);
-
-        if (fetchedDecisions.length > 0) {
-          setDecisions(fetchedDecisions);
+        setProjects(fetchedProjects || []);
+        setDecisions(fetchedDecisions || []);
+        if (fetchedDecisions && fetchedDecisions.length > 0) {
           setSelectedDecisionId(prev => prev || fetchedDecisions[0].id);
-        } else if (fetchedProjects.length > 0) {
-          // Seed initial decisions matching Stitch specification
-          const nexusProj = fetchedProjects.find(p => p.name.includes('Nexus')) || fetchedProjects[0];
-          try {
-            const sampleDecisions = [
-              {
-                project_id: nexusProj.id,
-                title: 'Adopt Kafka KRaft mode to eliminate ZooKeeper operational overhead',
-                description: 'Operating a dedicated 3-node Apache ZooKeeper ensemble introduces severe cold-start latency, complex quorum failover split-brain hazards, and requires 18% additional monthly compute spend solely for metadata coordination. During peak traffic failover drills on the legacy Core Platform, ZooKeeper-to-Broker session timeouts regularly took 14–22 seconds to elect a new partition leader. As part of the Nexus infrastructure migration, we evaluated Kafka 3.6+ KRaft to unify consensus inside native Kafka broker processes.',
-                rationale: 'Deploy Kafka KRaft consensus controller nodes natively embedded into broker metadata quorum. Formally decommission the legacy standalone 3-node ZooKeeper cluster for all stage, canary, and production VPC clusters under the Nexus migration scope. Eliminates 3 dedicated m6i.large EC2 instances per environment, reduces p99 broker leader election failover time from ~14s to <2s, and unifies config file syntax across controllers and brokers.',
-                decided_by: 'Elena Rostova & Marcus Vance',
-                decision_date: '2025-10-08T17:34:00Z',
-                actor: 'Elena Rostova',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Enforce TLS 1.3 mutual auth for all microservice producers',
-                description: 'Mandates SPIFFE/SPIRE x509 cert rotation across all ingress endpoints with strict zero-trust boundary verification.',
-                rationale: 'Zero-trust perimeter security requires automatic short-lived credential rotation across service meshes to mitigate replay attacks.',
-                decided_by: 'Soren Brandt & Elena Rostova',
-                decision_date: '2025-10-03T11:30:00Z',
-                actor: 'Soren Brandt',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Transition session token storage to Redis Enterprise Cluster',
-                description: 'Moving from PostgreSQL row-level session hashes to in-memory active-active multi-region replication rings.',
-                rationale: 'Reduces database read I/O by 64% and ensures sub-millisecond token lookup times during high-frequency user authentications.',
-                decided_by: 'Devina Nair',
-                decision_date: '2025-10-14T09:15:00Z',
-                actor: 'Devina Nair',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Retain 7-day log segment retention policy with tiered S3 cold storage',
-                description: 'Local NVMe drives purge after 168 hours; background tiering workers offload chunks to compressed Parquet buckets.',
-                rationale: 'Optimizes NVMe SSD storage costs while maintaining compliant immutable 7-year audit archives in tiered object storage.',
-                decided_by: 'Storage Working Group',
-                decision_date: '2025-09-28T14:00:00Z',
-                actor: 'Elena Rostova',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Deprecate GraphQL Federation gateway in favor of gRPC-Web Envoy proxies',
-                description: 'Standardizes protobuf contracts across microservices, eliminating N+1 query waterfall overheads.',
-                rationale: 'gRPC-Web streaming eliminates runtime GraphQL query planning latency and enforces strict contract type-safety across distributed services.',
-                decided_by: 'Priyah Sharma',
-                decision_date: '2025-09-15T16:20:00Z',
-                actor: 'Priyah Sharma',
-              },
-            ];
-
-            const createdList: Decision[] = [];
-            for (const sd of sampleDecisions) {
-              const created = await api.createDecision(sd);
-              createdList.push(created);
-            }
-            if (!isMounted) return;
-            setDecisions(createdList);
-            setSelectedDecisionId(createdList[0].id);
-          } catch {
-            if (!isMounted) return;
-            setDecisions([]);
-          }
+        } else {
+          setSelectedDecisionId(null);
         }
       } catch (err) {
         console.error('Failed to load decisions:', err);
@@ -207,7 +146,7 @@ export const DecisionsScreen: React.FC = () => {
         rationale: formData.rationale.trim() || undefined,
         decided_by: formData.decidedBy.trim() || undefined,
         decision_date: formData.decisionDate ? new Date(formData.decisionDate).toISOString() : undefined,
-        actor: 'Elena Rostova',
+        actor: profile.displayName || 'User',
       });
 
       setDecisions(prev => [newDecision, ...prev]);
@@ -218,7 +157,7 @@ export const DecisionsScreen: React.FC = () => {
         title: '',
         description: '',
         rationale: '',
-        decidedBy: 'Elena Rostova & Marcus Vance',
+        decidedBy: profile.displayName || 'User',
         decisionDate: new Date().toISOString().slice(0, 10),
       });
     } catch (err: unknown) {
@@ -246,7 +185,7 @@ export const DecisionsScreen: React.FC = () => {
         rationale: formData.rationale.trim() || undefined,
         decided_by: formData.decidedBy.trim() || undefined,
         decision_date: formData.decisionDate ? new Date(formData.decisionDate).toISOString() : undefined,
-        actor: 'Elena Rostova',
+        actor: profile.displayName || 'User',
       });
 
       setDecisions(prev => prev.map(d => (d.id === selectedDecision.id ? updated : d)));
@@ -277,7 +216,7 @@ export const DecisionsScreen: React.FC = () => {
       title: '',
       description: '',
       rationale: '',
-      decidedBy: 'Elena Rostova & Marcus Vance',
+      decidedBy: profile.displayName || 'User',
       decisionDate: new Date().toISOString().slice(0, 10),
     });
     setFormError(null);
@@ -287,7 +226,7 @@ export const DecisionsScreen: React.FC = () => {
   const handleDeleteDecision = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this decision record?')) return;
     try {
-      await api.deleteDecision(id, 'Elena Rostova');
+      await api.deleteDecision(id, profile.displayName || 'User');
       setDecisions(prev => prev.filter(d => d.id !== id));
       if (selectedDecisionId === id) {
         const remaining = decisions.filter(d => d.id !== id);
@@ -537,7 +476,23 @@ export const DecisionsScreen: React.FC = () => {
             </div>
 
             <div className="flex flex-col p-space-sm gap-space-xs overflow-y-auto">
-              {filteredDecisions.length === 0 ? (
+              {decisions.length === 0 ? (
+                <div className="py-12 px-4 text-center text-on-surface-variant font-body-sm space-y-2">
+                  <span className="material-symbols-outlined text-[36px] text-outline">gavel</span>
+                  <p className="font-headline-sm text-headline-sm text-on-surface font-semibold">No decisions recorded yet</p>
+                  <p className="font-body-sm text-[12px] text-on-surface-variant max-w-xs mx-auto">
+                    Decisions appear here after being recorded or approved from extracted document ADRs in the AI Review Queue.
+                  </p>
+                  <button
+                    onClick={openCreateModal}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-primary text-on-primary font-label-md text-label-md cursor-pointer hover:bg-primary-container transition-colors shadow-xs"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <span>Record First Decision</span>
+                  </button>
+                </div>
+              ) : filteredDecisions.length === 0 ? (
                 <div className="py-12 text-center text-on-surface-variant font-body-sm text-body-sm">
                   No decision records found matching query.
                 </div>
@@ -546,7 +501,7 @@ export const DecisionsScreen: React.FC = () => {
                   const isSelected = selectedDecision?.id === decision.id;
                   const adrId = getAdrIdentifier(decision.id, idx);
                   const cat = getAdrCategory(idx);
-                  const projName = projectMap.get(decision.project_id)?.name || 'Nexus Migration';
+                  const projName = projectMap.get(decision.project_id)?.name || 'Project';
                   const isPending = idx === 2;
 
                   return (
@@ -598,13 +553,13 @@ export const DecisionsScreen: React.FC = () => {
 
                       <div className="mt-1 pt-2 flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm border-t border-outline-variant/10">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-[10px] text-on-primary font-medium">
-                            ER
+                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-[9px] text-on-primary font-medium">
+                            {(decision.decided_by || profile.displayName || 'User').slice(0, 2).toUpperCase()}
                           </div>
-                          <span className="truncate">{decision.decided_by || 'Elena Rostova'}</span>
+                          <span className="truncate">{decision.decided_by || profile.displayName || 'User'}</span>
                         </div>
                         <span className="font-code-inline text-[11px]">
-                          {decision.decision_date ? new Date(decision.decision_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Oct 08, 2025'}
+                          {decision.decision_date ? new Date(decision.decision_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : new Date(decision.created_at).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -623,13 +578,12 @@ export const DecisionsScreen: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-primary text-on-primary font-code-inline text-[12px] font-semibold">
-                        ADR-042
+                        ADR
                       </span>
                       <span className="px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary font-label-sm text-label-sm font-medium flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">verified</span>
                         Ratified &amp; Enforced
                       </span>
-                      <span className="text-on-surface-variant font-label-sm text-label-sm">v1.2 (Final)</span>
                     </div>
                     <div className="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
                       <span className="material-symbols-outlined text-[16px]">folder_open</span>
@@ -637,7 +591,7 @@ export const DecisionsScreen: React.FC = () => {
                         onClick={() => navigateTo('project-workspace')}
                         className="hover:text-primary cursor-pointer font-medium"
                       >
-                        {projectMap.get(selectedDecision.project_id)?.name || 'Nexus Infrastructure Migration'}
+                        {projectMap.get(selectedDecision.project_id)?.name || 'Project Workspace'}
                       </span>
                     </div>
                   </div>
@@ -650,19 +604,14 @@ export const DecisionsScreen: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-space-xs mt-1 bg-surface-container-lowest p-space-sm rounded border border-outline-variant/20">
                     <div className="flex flex-col">
                       <span className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-medium">
-                        Decision Leads
+                        Decision Lead
                       </span>
                       <div className="flex items-center gap-2 mt-1">
-                        <div className="flex -space-x-1.5">
-                          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-on-primary font-semibold">
-                            ER
-                          </div>
-                          <div className="w-6 h-6 rounded-full bg-tertiary flex items-center justify-center text-[10px] text-on-tertiary font-semibold">
-                            MV
-                          </div>
+                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-[10px] text-on-primary font-semibold">
+                          {(selectedDecision.decided_by || profile.displayName || 'User').slice(0, 2).toUpperCase()}
                         </div>
                         <span className="font-label-md text-label-md text-on-surface font-medium truncate">
-                          {selectedDecision.decided_by || 'Elena Rostova & Marcus Vance'}
+                          {selectedDecision.decided_by || profile.displayName || 'User'}
                         </span>
                       </div>
                     </div>
@@ -695,7 +644,7 @@ export const DecisionsScreen: React.FC = () => {
                   </div>
                   <p className="font-body-md text-body-md text-on-surface leading-relaxed pl-3.5">
                     {selectedDecision.description ||
-                      'Operating a dedicated 3-node Apache ZooKeeper ensemble introduces severe cold-start latency, complex quorum failover split-brain hazards, and requires 18% additional monthly compute spend solely for metadata coordination. During peak traffic failover drills on the legacy Core Platform, ZooKeeper-to-Broker session timeouts regularly took 14–22 seconds to elect a new partition leader. As part of the Nexus infrastructure migration, we evaluated Kafka 3.6+ KRaft to unify consensus inside native Kafka broker processes.'}
+                      'No detailed problem statement was specified for this decision record.'}
                   </p>
                 </section>
 
@@ -704,7 +653,7 @@ export const DecisionsScreen: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-primary-container rounded-full" />
                     <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold uppercase tracking-wider text-[12px]">
-                      2. Decision Made
+                      2. Ratified Decision
                     </h3>
                   </div>
                   <div className="pl-3.5">
@@ -717,223 +666,66 @@ export const DecisionsScreen: React.FC = () => {
                       </div>
                       <p className="font-body-md text-body-md text-on-surface leading-relaxed">
                         {selectedDecision.rationale ||
-                          'Deploy Kafka KRaft consensus controller nodes natively embedded into broker metadata quorum. Formally decommission the legacy standalone 3-node ZooKeeper cluster for all stage, canary, and production VPC clusters under the Nexus migration scope.'}
+                          'The architecture council and project leads ratified this architectural decision.'}
                       </p>
                     </div>
                   </div>
                 </section>
 
-                {/* Section 3: Rationale & Evaluation Matrix */}
+                {/* Section 3: Project & Scope */}
                 <section className="flex flex-col gap-space-xs">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-primary-container rounded-full" />
                     <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold uppercase tracking-wider text-[12px]">
-                      3. Rationale &amp; Evaluation Matrix
+                      3. Project Scope &amp; Continuity
                     </h3>
                   </div>
                   <div className="pl-3.5">
-                    <div className="overflow-hidden rounded-lg bg-surface-container-low/40 border border-outline-variant/20">
-                      <table className="w-full text-left font-body-sm text-body-sm">
-                        <thead className="bg-surface-container-low text-on-surface-variant font-label-sm text-[11px] uppercase tracking-wider font-semibold">
-                          <tr>
-                            <th className="py-2.5 px-3">Evaluation Criteria</th>
-                            <th className="py-2.5 px-3 bg-primary-fixed/40 text-on-primary-fixed font-bold">
-                              Kafka KRaft (Selected)
-                            </th>
-                            <th className="py-2.5 px-3">Apache ZooKeeper</th>
-                            <th className="py-2.5 px-3">External Etcd</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-container">
-                          <tr className="bg-surface-container-lowest">
-                            <td className="py-2.5 px-3 font-medium text-on-surface">Quorum Recovery Time</td>
-                            <td className="py-2.5 px-3 bg-primary-fixed/20 font-semibold text-primary font-code-inline">&lt; 1.8 seconds</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant font-code-inline">14.4 seconds</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant font-code-inline">6.2 seconds</td>
-                          </tr>
-                          <tr className="bg-surface-container-lowest">
-                            <td className="py-2.5 px-3 font-medium text-on-surface">Maintenance Overhead</td>
-                            <td className="py-2.5 px-3 bg-primary-fixed/20 font-semibold text-primary">Single JVM runtime profile</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant">Dual cluster topologies</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant">Separate Go runtime daemon</td>
-                          </tr>
-                          <tr className="bg-surface-container-lowest">
-                            <td className="py-2.5 px-3 font-medium text-on-surface">Partition Scaling Ceiling</td>
-                            <td className="py-2.5 px-3 bg-primary-fixed/20 font-semibold text-primary font-code-inline">1,000,000+</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant font-code-inline">~200,000 (zk limits)</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant font-code-inline">~150,000</td>
-                          </tr>
-                          <tr className="bg-surface-container-lowest">
-                            <td className="py-2.5 px-3 font-medium text-on-surface">Monthly Compute Savings</td>
-                            <td className="py-2.5 px-3 bg-primary-fixed/20 font-semibold text-primary font-code-inline">-$2,840 / mo</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant">Baseline ($0)</td>
-                            <td className="py-2.5 px-3 text-on-surface-variant font-code-inline">+$450 / mo</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Section 4: Alternatives Considered */}
-                <section className="flex flex-col gap-space-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-primary-container rounded-full" />
-                    <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold uppercase tracking-wider text-[12px]">
-                      4. Alternatives Considered
-                    </h3>
-                  </div>
-                  <p className="font-body-md text-body-md text-on-surface leading-relaxed pl-3.5">
-                    We evaluated AWS Managed Apache ZooKeeper as well as an external Etcd coordination connector. AWS Managed ZooKeeper was dismissed due to custom internal SASL/SCRAM authentication incompatibilities with Acme’s identity bridge. The Etcd connector was ruled out due to RPC serialization latency penalties and unverified partition rebalance guarantees under high topic write velocity.
-                  </p>
-                </section>
-
-                {/* Section 5: Consequences & Trade-offs */}
-                <section className="flex flex-col gap-space-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-primary-container rounded-full" />
-                    <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold uppercase tracking-wider text-[12px]">
-                      5. Consequences &amp; Trade-offs
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-sm pl-3.5">
-                    <div className="p-space-md rounded bg-surface-container-low/50 flex flex-col gap-2 border border-outline-variant/15">
-                      <div className="flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px] text-tertiary">add_circle</span>
-                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-tertiary">
-                          Positive Impacts
+                    <div className="p-space-md rounded bg-surface-container-low/40 border border-outline-variant/20 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-outline">Associated Project:</span>
+                        <span className="font-semibold text-on-surface">
+                          {projectMap.get(selectedDecision.project_id)?.name || 'Project Workspace'}
                         </span>
                       </div>
-                      <ul className="flex flex-col gap-1.5 font-body-sm text-body-sm text-on-surface">
-                        <li className="flex items-start gap-1.5">
-                          <span className="material-symbols-outlined text-[14px] text-tertiary mt-0.5">check</span>
-                          <span>Eliminates 3 dedicated m6i.large EC2 instances per environment.</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="material-symbols-outlined text-[14px] text-tertiary mt-0.5">check</span>
-                          <span>Reduces p99 broker leader election failover time from ~14s to &lt;2s.</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="material-symbols-outlined text-[14px] text-tertiary mt-0.5">check</span>
-                          <span>Unified config file syntax across controllers and regular brokers.</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div className="p-space-md rounded bg-surface-container-low/50 flex flex-col gap-2 border border-outline-variant/15">
-                      <div className="flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px] text-secondary">remove_circle</span>
-                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-secondary">
-                          Negative / Complexities
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-outline">Decision Date:</span>
+                        <span className="font-code-inline text-on-surface">
+                          {new Date(selectedDecision.decision_date || selectedDecision.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      <ul className="flex flex-col gap-1.5 font-body-sm text-body-sm text-on-surface">
-                        <li className="flex items-start gap-1.5">
-                          <span className="material-symbols-outlined text-[14px] text-secondary mt-0.5">priority_high</span>
-                          <span>Requires precise one-way metadata topic offset partition log migration.</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="material-symbols-outlined text-[14px] text-secondary mt-0.5">priority_high</span>
-                          <span>Third-party monitoring agents must upgrade to JMX Kafka 3.6+ schema.</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Section 6: Linked Artifacts & Source Evidence */}
-                <section className="flex flex-col gap-space-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-primary-container rounded-full" />
-                    <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold uppercase tracking-wider text-[12px]">
-                      6. Linked Artifacts &amp; Source Evidence
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm pl-3.5">
-                    <div className="p-space-sm rounded bg-surface-container-low/70 flex flex-col justify-between border border-outline-variant/20">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-on-surface-variant">description</span>
-                        <span className="font-label-sm text-label-sm font-semibold text-on-surface truncate">
-                          Source Specification
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-col gap-0.5">
-                        <span
-                          onClick={() => navigateTo('documents')}
-                          className="font-code-inline text-[12px] text-primary hover:underline cursor-pointer truncate font-medium"
-                        >
-                          RFC-109-kraft-consensus.pdf
-                        </span>
-                        <span className="font-label-sm text-label-sm text-on-surface-variant">
-                          Linked to Docs (Section 4, p.14)
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-space-sm rounded bg-surface-container-low/70 flex flex-col justify-between border border-outline-variant/20">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-on-surface-variant">commit</span>
-                        <span className="font-label-sm text-label-sm font-semibold text-on-surface truncate">
-                          Git Commit Reference
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-col gap-0.5">
-                        <span
-                          onClick={() => navigateTo('activity')}
-                          className="font-code-inline text-[12px] text-primary hover:underline cursor-pointer truncate font-medium"
-                        >
-                          commit #a8f912c
-                        </span>
-                        <span className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                          core-platform/broker-cfg
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-space-sm rounded bg-surface-container-low/70 flex flex-col justify-between border border-outline-variant/20">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-on-surface-variant">task_alt</span>
-                        <span className="font-label-sm text-label-sm font-semibold text-on-surface truncate">
-                          Linked Tasks
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span
-                          onClick={() => navigateTo('my-tasks')}
-                          className="px-1.5 py-0.5 rounded bg-surface-container-highest font-code-inline text-[11px] font-medium text-on-surface hover:bg-surface-container cursor-pointer"
-                        >
-                          TASK-904
-                        </span>
-                        <span
-                          onClick={() => navigateTo('my-tasks')}
-                          className="px-1.5 py-0.5 rounded bg-surface-container-highest font-code-inline text-[11px] font-medium text-on-surface hover:bg-surface-container cursor-pointer"
-                        >
-                          TASK-882
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-outline">Continuity Status:</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-800 font-medium">
+                          <span className="material-symbols-outlined text-[14px]">verified</span>
+                          Verified in Knowledge Base
                         </span>
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Section 7: Human Sign-off Audit Trail */}
+                {/* Section 4: Human Sign-off Audit Trail */}
                 <section className="flex flex-col gap-space-xs pt-space-xs">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-tertiary-container rounded-full" />
                     <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold uppercase tracking-wider text-[12px]">
-                      7. Human Sign-off Audit Trail
+                      4. Human Sign-off Audit Trail
                     </h3>
                   </div>
                   <div className="pl-3.5">
                     <div className="p-space-md rounded bg-surface-container-low/40 flex flex-col gap-space-sm border border-outline-variant/20">
-                      <div className="flex items-center justify-between pb-space-xs border-b border-outline-variant/15">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-on-primary font-label-sm text-[11px] font-semibold">
-                            ER
+                            {(selectedDecision.decided_by || profile.displayName || 'User').slice(0, 2).toUpperCase()}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-label-md text-label-md font-semibold text-on-surface">Elena Rostova</span>
+                            <span className="font-label-md text-label-md font-semibold text-on-surface">
+                              {selectedDecision.decided_by || profile.displayName || 'User'}
+                            </span>
                             <span className="font-label-sm text-label-sm text-on-surface-variant">
-                              Staff Platform Product Lead • Acme Platform Org
+                              Ratified Decision Signatory
                             </span>
                           </div>
                         </div>
@@ -942,29 +734,7 @@ export const DecisionsScreen: React.FC = () => {
                             <span className="material-symbols-outlined text-[14px]">done_all</span> Signed Off
                           </span>
                           <span className="font-code-inline text-[11px] text-on-surface-variant">
-                            Oct 08, 2025 • 17:34 UTC
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-space-xs">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-tertiary flex items-center justify-center text-on-tertiary font-label-sm text-[11px] font-semibold">
-                            MV
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-label-md text-label-md font-semibold text-on-surface">Marcus Vance</span>
-                            <span className="font-label-sm text-label-sm text-on-surface-variant">
-                              Principal Systems Reliability Architect • SRE Group
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-tertiary font-label-sm text-label-sm font-semibold">
-                            <span className="material-symbols-outlined text-[14px]">done_all</span> Signed Off
-                          </span>
-                          <span className="font-code-inline text-[11px] text-on-surface-variant">
-                            Oct 09, 2025 • 09:12 UTC
+                            {new Date(selectedDecision.decision_date || selectedDecision.created_at).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
@@ -1065,7 +835,7 @@ export const DecisionsScreen: React.FC = () => {
                   type="text"
                   value={formData.title}
                   onChange={e => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g. Adopt Kafka KRaft mode to eliminate ZooKeeper"
+                  placeholder="e.g. Migrate authentication service to OAuth2 / OpenID Connect"
                   maxLength={200}
                   className="h-9 px-3 rounded bg-surface-container-low text-on-surface border border-outline-variant/40 focus:outline-none focus:border-primary"
                   required

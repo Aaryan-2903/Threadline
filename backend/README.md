@@ -124,6 +124,58 @@ Once running, interactive OpenAPI API docs are available at:
 
 ---
 
+## Database Migrations (Alembic)
+
+Threadline uses **Alembic** to manage schema migrations across SQLite (local development) and PostgreSQL (production).
+
+All migration commands should be run from the `backend/` working directory with the virtual environment activated:
+
+```powershell
+cd backend
+```
+
+### Common Migration Commands
+
+- **Apply all pending migrations to the database:**
+  ```powershell
+  alembic upgrade head
+  ```
+- **Check current database revision:**
+  ```powershell
+  alembic current
+  ```
+- **View migration history:**
+  ```powershell
+  alembic history --verbose
+  ```
+- **Roll back the most recent migration:**
+  ```powershell
+  alembic downgrade -1
+  ```
+- **Roll back all migrations to empty base:**
+  ```powershell
+  alembic downgrade base
+  ```
+- **Generate a new migration revision (after modifying SQLAlchemy models):**
+  ```powershell
+  alembic revision --autogenerate -m "describe_changes"
+  ```
+
+### Target Environment Configuration
+
+Alembic resolves the target database URL dynamically from the `DATABASE_URL` environment variable or `app.core.config.settings.DATABASE_URL` without hardcoding credentials:
+
+- **Local SQLite (default)**: `alembic upgrade head` applies migrations to `sqlite:///./threadline.db`.
+- **Production PostgreSQL**: Provide the `DATABASE_URL` connection string:
+  ```bash
+  DATABASE_URL="postgresql+psycopg://user:password@host:port/dbname" alembic upgrade head
+  ```
+
+> [!NOTE]
+> In local development and automated test runs, `init_db()` is also executed on startup as a fallback to ensure fresh development databases work out of the box. For production deployments, execute `alembic upgrade head` during deployment build/release phases.
+
+---
+
 ## API Documentation
 
 All routes are mounted under `/api/v1`.

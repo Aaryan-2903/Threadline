@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { Task, Project, TaskStatus, TaskPriority } from '../types';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
+import { useUserProfile } from '../context/useUserProfile';
 
 type TabFilter = 'all' | 'unfinished' | 'blockers' | 'overdue' | 'completed';
 
 export const MyTasksScreen: React.FC = () => {
   const { navigateTo } = useNavigation();
+  const { profile } = useUserProfile();
   const [currentTimestamp] = useState(() => Date.now());
 
   // State
@@ -36,7 +38,7 @@ export const MyTasksScreen: React.FC = () => {
     description: '',
     priority: 'medium' as TaskPriority,
     status: 'todo' as TaskStatus,
-    assignee: 'Elena Rostova',
+    assignee: profile.displayName || 'User',
     dueDate: '',
   });
 
@@ -53,105 +55,12 @@ export const MyTasksScreen: React.FC = () => {
         ]);
 
         if (!isMounted) return;
-        setProjects(fetchedProjects);
-
-        if (fetchedTasks.length > 0) {
-          setTasks(fetchedTasks);
+        setProjects(fetchedProjects || []);
+        setTasks(fetchedTasks || []);
+        if (fetchedTasks && fetchedTasks.length > 0) {
           setSelectedTaskId(prev => prev || fetchedTasks[0].id);
-        } else if (fetchedProjects.length > 0) {
-          // If DB has projects but 0 tasks, seed initial tasks matching Stitch spec into backend
-          const nexusProj = fetchedProjects.find(p => p.name.includes('Nexus')) || fetchedProjects[0];
-          try {
-            const sampleTasks = [
-              {
-                project_id: nexusProj.id,
-                title: 'Staging VPC peering packet loss under 50k req/s load test',
-                description: 'MTU mismatch identified between Kubernetes CNI and AWS transit gateway. MTU renegotiation test script authored. Requires root AWS IAM elevation to apply kernel MTU parameters in cluster nodes.',
-                priority: 'urgent' as TaskPriority,
-                status: 'blocked' as TaskStatus,
-                assignee: 'Elena Rostova',
-                due_date: new Date(currentTimestamp - 2 * 86400000).toISOString(),
-                actor: 'Elena Rostova',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Legacy audit log schema compatibility with MSK Connect',
-                description: 'Validate Kafka Connect schema registry serializers and Protobuf descriptor mappings for event streaming pipelines.',
-                priority: 'high' as TaskPriority,
-                status: 'in_progress' as TaskStatus,
-                assignee: 'Marcus Vance',
-                due_date: new Date(currentTimestamp + 4 * 86400000).toISOString(),
-                actor: 'Marcus Vance',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Access credentials transfer for Confluent Cloud registry',
-                description: 'Rotate API access keys and delegate KMS envelope encryption master keys to incoming platform reliability lead.',
-                priority: 'medium' as TaskPriority,
-                status: 'todo' as TaskStatus,
-                assignee: 'Elena Rostova',
-                due_date: new Date(currentTimestamp + 2 * 86400000).toISOString(),
-                actor: 'Elena Rostova',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Finalize IdP token revocation policy and TTL sync',
-                description: 'Bridge Okta SCIM directory events with OIDC session lifetime revocation hooks.',
-                priority: 'urgent' as TaskPriority,
-                status: 'in_progress' as TaskStatus,
-                assignee: 'Elena Rostova',
-                due_date: new Date(currentTimestamp + 1 * 86400000).toISOString(),
-                actor: 'Elena Rostova',
-              },
-              {
-                project_id: nexusProj.id,
-                title: 'Reconcile Stripe webhook idempotency edge cases',
-                description: 'Verify Redis lock lease expiration and transactional rollback guarantees during distributed network partitions.',
-                priority: 'high' as TaskPriority,
-                status: 'blocked' as TaskStatus,
-                assignee: 'David Lin',
-                due_date: new Date(currentTimestamp + 5 * 86400000).toISOString(),
-                actor: 'David Lin',
-              },
-            ];
-
-            const createdTasks: Task[] = [];
-            for (const st of sampleTasks) {
-              const created = await api.createTask(st);
-              createdTasks.push(created);
-            }
-            if (!isMounted) return;
-            setTasks(createdTasks);
-            setSelectedTaskId(createdTasks[0].id);
-          } catch {
-            if (!isMounted) return;
-            setTasks([]);
-          }
         } else {
-          // No projects in DB: create Nexus project first, then seed
-          try {
-            const newProj = await api.createProject({
-              name: 'Nexus Infrastructure Migration',
-              description: 'Core cloud VPC and Kafka modernization project with zero-downtime cutover.',
-            });
-            if (!isMounted) return;
-            setProjects([newProj]);
-            const created = await api.createTask({
-              project_id: newProj.id,
-              title: 'Staging VPC peering packet loss under 50k req/s load test',
-              description: 'MTU mismatch identified between Kubernetes CNI and AWS transit gateway. MTU renegotiation test script authored.',
-              priority: 'urgent',
-              status: 'blocked',
-              assignee: 'Elena Rostova',
-              actor: 'Elena Rostova',
-            });
-            if (!isMounted) return;
-            setTasks([created]);
-            setSelectedTaskId(created.id);
-          } catch {
-            if (!isMounted) return;
-            setTasks([]);
-          }
+          setSelectedTaskId(null);
         }
       } catch (err: unknown) {
         console.error('Failed to load tasks:', err);
@@ -169,7 +78,7 @@ export const MyTasksScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentTimestamp]);
+  }, []);
 
   // Selected task
   const selectedTask = useMemo(() => {
@@ -230,7 +139,7 @@ export const MyTasksScreen: React.FC = () => {
     try {
       const updated = await api.updateTask(taskId, {
         status: newStatus,
-        actor: 'Elena Rostova',
+        actor: profile.displayName || 'User',
       });
       setTasks(prev => prev.map(t => (t.id === taskId ? updated : t)));
     } catch (err) {
@@ -242,7 +151,7 @@ export const MyTasksScreen: React.FC = () => {
   const handleDeleteTask = async (taskId: string) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
     try {
-      await api.deleteTask(taskId, 'Elena Rostova');
+      await api.deleteTask(taskId, profile.displayName || 'User');
       setTasks(prev => prev.filter(t => t.id !== taskId));
       if (selectedTaskId === taskId) {
         const remaining = tasks.filter(t => t.id !== taskId);
@@ -278,7 +187,7 @@ export const MyTasksScreen: React.FC = () => {
         status: formData.status,
         assignee: formData.assignee.trim() || undefined,
         due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
-        actor: 'Elena Rostova',
+        actor: profile.displayName || 'User',
       });
 
       setTasks(prev => [newTask, ...prev]);
@@ -290,7 +199,7 @@ export const MyTasksScreen: React.FC = () => {
         description: '',
         priority: 'medium',
         status: 'todo',
-        assignee: 'Elena Rostova',
+        assignee: profile.displayName || 'User',
         dueDate: '',
       });
     } catch (err: unknown) {
@@ -319,7 +228,7 @@ export const MyTasksScreen: React.FC = () => {
         status: formData.status,
         assignee: formData.assignee.trim() || undefined,
         due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
-        actor: 'Elena Rostova',
+        actor: profile.displayName || 'User',
       });
 
       setTasks(prev => prev.map(t => (t.id === selectedTask.id ? updated : t)));
@@ -352,7 +261,7 @@ export const MyTasksScreen: React.FC = () => {
       description: '',
       priority: 'medium',
       status: 'todo',
-      assignee: 'Elena Rostova',
+      assignee: profile.displayName || 'User',
       dueDate: '',
     });
     setFormError(null);
@@ -696,7 +605,27 @@ export const MyTasksScreen: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="font-body-sm text-body-sm text-on-surface divide-y divide-outline-variant/10">
-                    {filteredTasks.length === 0 ? (
+                    {tasks.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-on-surface-variant">
+                          <div className="flex flex-col items-center gap-2 max-w-sm mx-auto">
+                            <span className="material-symbols-outlined text-[36px] text-outline">checklist</span>
+                            <span className="font-headline-sm text-headline-sm text-on-surface font-semibold">No tasks created yet</span>
+                            <p className="font-body-sm text-[12px] text-on-surface-variant">
+                              Tasks appear here after being created or approved from extracted document knowledge in the AI Review Queue.
+                            </p>
+                            <button
+                              onClick={openCreateModal}
+                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-primary text-on-primary font-label-md text-label-md cursor-pointer hover:bg-primary-container transition-colors shadow-xs"
+                              type="button"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">add</span>
+                              <span>Create First Task</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : filteredTasks.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-on-surface-variant">
                           <div className="flex flex-col items-center gap-2">
@@ -837,14 +766,9 @@ export const MyTasksScreen: React.FC = () => {
                                   <span className="material-symbols-outlined text-[13px]">block</span>
                                   Handover Blocker
                                 </span>
-                              ) : task.assignee?.includes('Marcus') ? (
-                                <div className="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-[11px]">
-                                  <span className="material-symbols-outlined text-[14px] text-tertiary">swap_horiz</span>
-                                  <span>To Marcus V.</span>
-                                </div>
                               ) : (
                                 <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-[11px]">
-                                  {task.assignee || 'Elena R. (Self)'}
+                                  {task.assignee || profile.displayName || 'User'}
                                 </span>
                               )}
                             </td>
@@ -969,36 +893,24 @@ export const MyTasksScreen: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Section: Succession & Ownership Transition Badging */}
-                  <div className="flex flex-col gap-2">
+                  {/* Section: Task Ownership & Succession */}
+                  <div className="flex flex-col gap-1.5">
                     <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">
-                      Succession Handover Impact
+                      Task Ownership
                     </span>
                     <div className="p-3 rounded bg-surface-container-low flex flex-col gap-2 border border-outline-variant/15">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-primary-container text-on-primary flex items-center justify-center text-[11px] font-medium">
-                            ER
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-label-sm text-label-sm text-on-surface font-semibold leading-none">Elena Rostova</span>
-                            <span className="font-label-sm text-[10px] text-on-surface-variant">Current Lead</span>
-                          </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center text-[11px] font-medium">
+                          {(selectedTask.assignee || profile.displayName || 'User').slice(0, 2).toUpperCase()}
                         </div>
-                        <span className="material-symbols-outlined text-[18px] text-on-surface-variant">arrow_forward</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-secondary-container text-on-secondary-fixed flex items-center justify-center text-[11px] font-medium">
-                            MV
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-label-sm text-label-sm text-on-surface font-semibold leading-none">Marcus Vance</span>
-                            <span className="font-label-sm text-[10px] text-on-surface-variant">Designated Successor</span>
-                          </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-label-sm text-label-sm text-on-surface font-semibold leading-none truncate">
+                            {selectedTask.assignee || profile.displayName || 'User'}
+                          </span>
+                          <span className="font-label-sm text-[10px] text-on-surface-variant">
+                            Assigned Owner
+                          </span>
                         </div>
-                      </div>
-                      <div className="text-[11px] text-on-surface-variant bg-surface-container-lowest p-2 rounded flex items-center gap-1.5 border border-outline-variant/20">
-                        <span className="material-symbols-outlined text-[14px] text-tertiary">verified_user</span>
-                        <span>Requires dual cryptographic sign-off before transition freeze.</span>
                       </div>
                     </div>
                   </div>
@@ -1006,40 +918,23 @@ export const MyTasksScreen: React.FC = () => {
                   {/* Section: Linked Decisions (ADRs) */}
                   <div className="flex flex-col gap-1.5">
                     <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">
-                      Linked Architectural Decisions
+                      Architectural Context
                     </span>
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={() => navigateTo('decisions')}
-                        className="flex items-center justify-between p-2 rounded bg-surface-container-low hover:bg-surface-container transition-colors group text-left w-full"
-                        type="button"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="material-symbols-outlined text-[16px] text-primary">gavel</span>
-                          <span className="font-label-md text-label-md text-on-surface font-medium truncate">
-                            ADR-042: Adopt Kafka KRaft mode
-                          </span>
-                        </div>
-                        <span className="material-symbols-outlined text-[14px] text-on-surface-variant group-hover:text-on-surface transition-transform group-hover:translate-x-0.5">
-                          arrow_forward
+                    <button
+                      onClick={() => navigateTo('decisions')}
+                      className="flex items-center justify-between p-2.5 rounded bg-surface-container-low hover:bg-surface-container transition-colors group text-left w-full border border-surface-container"
+                      type="button"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="material-symbols-outlined text-[16px] text-primary">gavel</span>
+                        <span className="font-label-md text-label-md text-on-surface font-medium truncate">
+                          Explore Decisions Register
                         </span>
-                      </button>
-                      <button
-                        onClick={() => navigateTo('decisions')}
-                        className="flex items-center justify-between p-2 rounded bg-surface-container-low hover:bg-surface-container transition-colors group text-left w-full"
-                        type="button"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="material-symbols-outlined text-[16px] text-primary">gavel</span>
-                          <span className="font-label-md text-label-md text-on-surface font-medium truncate">
-                            ADR-041: TLS 1.3 mTLS across VPC boundaries
-                          </span>
-                        </div>
-                        <span className="material-symbols-outlined text-[14px] text-on-surface-variant group-hover:text-on-surface transition-transform group-hover:translate-x-0.5">
-                          arrow_forward
-                        </span>
-                      </button>
-                    </div>
+                      </div>
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant group-hover:text-on-surface transition-transform group-hover:translate-x-0.5">
+                        arrow_forward
+                      </span>
+                    </button>
                   </div>
 
                   {/* Section: Activity History Audit Feed */}
@@ -1055,7 +950,7 @@ export const MyTasksScreen: React.FC = () => {
                             Last updated on {new Date(selectedTask.updated_at).toLocaleDateString()}
                           </span>
                           <span className="font-label-sm text-[10px] text-on-surface-variant">
-                            Actor: {selectedTask.assignee || 'Elena Rostova'} • Verified event
+                            Actor: {selectedTask.assignee || profile.displayName || 'User'} • Verified event
                           </span>
                         </div>
                       </div>

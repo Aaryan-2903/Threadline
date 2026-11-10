@@ -12,9 +12,35 @@ def get_engine_args(url: str) -> dict:
     return connect_args
 
 
+def get_engine_options(url: str) -> dict:
+    """
+    Construct robust engine options based on the database URL and driver.
+    
+    - pool_pre_ping=True: Health-checks pooled connections on checkout to gracefully
+      recover from dropped or timed-out connections (e.g. Render / AWS PostgreSQL).
+    - pool_recycle=300: Recycles connections after 5 minutes to prevent stale TCP sockets.
+    - Preserves SQLite compatibility without passing unsupported connection pool arguments.
+    """
+    options = {
+        "pool_pre_ping": True,
+    }
+    connect_args = get_engine_args(url)
+
+    if url.startswith("sqlite"):
+        # Enable pool_recycle for file-based SQLite; omit for in-memory SQLite instances
+        if not (url.startswith("sqlite:///:memory:") or url == "sqlite://"):
+            options["pool_recycle"] = 300
+    else:
+        # PostgreSQL / remote RDBMS connection pools
+        options["pool_recycle"] = 300
+
+    options["connect_args"] = connect_args
+    return options
+
+
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args=get_engine_args(settings.DATABASE_URL),
+    **get_engine_options(settings.DATABASE_URL),
 )
 
 

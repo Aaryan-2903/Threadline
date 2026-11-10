@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.rate_limiter import limiter
 from app.database import Base, get_db
 from app.main import app
 
@@ -52,4 +53,12 @@ def client(db_session):
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset rate limiter state before and after each test for test isolation."""
+    limiter.clear()
+    yield
+    limiter.clear()
 
