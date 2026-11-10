@@ -1,4 +1,4 @@
-import type { Project, Task, Decision, Activity, TaskStatus, TaskPriority } from '../types';
+import type { Project, Task, Decision, Activity, TaskStatus, TaskPriority, DocumentItem, ExtractedClaim } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -240,6 +240,124 @@ export const api = {
       console.warn('Failed to fetch project activities:', e);
       return [];
     }
+  },
+
+  // Documents
+  async uploadDocument(file: File, projectId?: string, author?: string): Promise<DocumentItem> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (projectId) formData.append('project_id', projectId);
+    if (author) formData.append('author', author);
+
+    const response = await fetch(`${API_BASE}/documents/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Upload failed (${response.status}): ${err}`);
+    }
+
+    return response.json();
+  },
+
+  async getDocuments(projectId?: string): Promise<DocumentItem[]> {
+    try {
+      const url = projectId ? `${API_BASE}/documents?project_id=${projectId}` : `${API_BASE}/documents`;
+      return await fetchJson<DocumentItem[]>(url);
+    } catch (e) {
+      console.warn('Failed to fetch documents from API:', e);
+      return [];
+    }
+  },
+
+  async getDocument(id: string): Promise<DocumentItem | null> {
+    try {
+      return await fetchJson<DocumentItem>(`${API_BASE}/documents/${id}`);
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteDocument(id: string): Promise<void> {
+    await fetchJson<void>(`${API_BASE}/documents/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async reprocessDocument(id: string): Promise<DocumentItem> {
+    return fetchJson<DocumentItem>(`${API_BASE}/documents/${id}/process`, {
+      method: 'POST',
+    });
+  },
+
+  // AI Reviews
+  async getReviews(params?: {
+    project_id?: string;
+    document_id?: string;
+    status?: string;
+    category?: string;
+  }): Promise<ExtractedClaim[]> {
+    try {
+      const searchParams = new URLSearchParams();
+      if (params?.project_id) searchParams.append('project_id', params.project_id);
+      if (params?.document_id) searchParams.append('document_id', params.document_id);
+      if (params?.status) searchParams.append('status', params.status);
+      if (params?.category) searchParams.append('category', params.category);
+      const query = searchParams.toString();
+      const url = query ? `${API_BASE}/reviews?${query}` : `${API_BASE}/reviews`;
+      return await fetchJson<ExtractedClaim[]>(url);
+    } catch (e) {
+      console.warn('Failed to fetch reviews from API:', e);
+      return [];
+    }
+  },
+
+  async getReview(id: string): Promise<ExtractedClaim | null> {
+    try {
+      return await fetchJson<ExtractedClaim>(`${API_BASE}/reviews/${id}`);
+    } catch {
+      return null;
+    }
+  },
+
+  async approveReview(id: string, actor?: string): Promise<ExtractedClaim> {
+    const url = actor ? `${API_BASE}/reviews/${id}/approve?actor=${encodeURIComponent(actor)}` : `${API_BASE}/reviews/${id}/approve`;
+    return fetchJson<ExtractedClaim>(url, {
+      method: 'PATCH',
+    });
+  },
+
+  async rejectReview(id: string, actor?: string): Promise<ExtractedClaim> {
+    const url = actor ? `${API_BASE}/reviews/${id}/reject?actor=${encodeURIComponent(actor)}` : `${API_BASE}/reviews/${id}/reject`;
+    return fetchJson<ExtractedClaim>(url, {
+      method: 'PATCH',
+    });
+  },
+
+  async updateReview(id: string, data: Partial<ExtractedClaim>, actor?: string): Promise<ExtractedClaim> {
+    const url = actor ? `${API_BASE}/reviews/${id}?actor=${encodeURIComponent(actor)}` : `${API_BASE}/reviews/${id}`;
+    return fetchJson<ExtractedClaim>(url, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async approveAllReviews(params?: {
+    project_id?: string;
+    document_id?: string;
+    actor?: string;
+  }): Promise<{ message: string; approved_count: number }> {
+    const searchParams = new URLSearchParams();
+    if (params?.project_id) searchParams.append('project_id', params.project_id);
+    if (params?.document_id) searchParams.append('document_id', params.document_id);
+    if (params?.actor) searchParams.append('actor', params.actor);
+    const query = searchParams.toString();
+    const url = query ? `${API_BASE}/reviews/approve-all?${query}` : `${API_BASE}/reviews/approve-all`;
+    return fetchJson<{ message: string; approved_count: number }>(url, {
+      method: 'POST',
+    });
   },
 };
 

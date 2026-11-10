@@ -67,6 +67,46 @@ export interface Activity {
   timestamp: string;
 }
 
+export type DocumentStatus = 'uploaded' | 'processing' | 'extracted' | 'error';
+
+export interface DocumentItem {
+  id: string;
+  project_id?: string;
+  filename: string;
+  file_type: 'pdf' | 'docx' | string;
+  file_size: number;
+  author?: string;
+  status: DocumentStatus;
+  error_message?: string;
+  extracted_claims_count: number;
+  page_count: number;
+  created_at: string;
+  updated_at: string;
+  project_name?: string;
+}
+
+export type KnowledgeCategory = 'decision' | 'task' | 'risk' | 'question' | 'conflict';
+export type VerificationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ExtractedClaim {
+  id: string;
+  document_id: string;
+  project_id?: string;
+  category: KnowledgeCategory;
+  title: string;
+  content?: string;
+  evidence_snippet?: string;
+  source_reference?: string;
+  page_number?: number;
+  confidence: number;
+  status: VerificationStatus;
+  owner?: string;
+  impact_scope?: string;
+  created_at: string;
+  updated_at: string;
+  document_name?: string;
+}
+
 export type ScreenId =
   | 'overview'
   | 'my-projects'

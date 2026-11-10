@@ -8,6 +8,8 @@ import { ProjectWorkspaceScreen } from './screens/ProjectWorkspaceScreen';
 import { MyTasksScreen } from './screens/MyTasksScreen';
 import { DecisionsScreen } from './screens/DecisionsScreen';
 import { ActivityTimelineScreen } from './screens/ActivityTimelineScreen';
+import { DocumentsScreen } from './screens/DocumentsScreen';
+import { AIReviewQueueScreen } from './screens/AIReviewQueueScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 
 const MainRouter: React.FC = () => {
@@ -28,14 +30,7 @@ const MainRouter: React.FC = () => {
       return <ActivityTimelineScreen />;
 
     case 'documents':
-      return (
-        <PlaceholderScreen
-          title="Documents Hub"
-          badge="OCR Pipeline"
-          subtitle="Source evidence hub for architecture RFCs, specifications, meeting logs, and handover notes."
-          icon="description"
-        />
-      );
+      return <DocumentsScreen />;
     case 'handover-reports':
       return (
         <PlaceholderScreen
@@ -46,14 +41,7 @@ const MainRouter: React.FC = () => {
         />
       );
     case 'ai-review-queue':
-      return (
-        <PlaceholderScreen
-          title="AI Knowledge Review Queue"
-          badge="Engine v4.2 Active"
-          subtitle="Verify, edit, or dispute AI-extracted decisions, tasks, blockers, and risks before project ratification."
-          icon="psychology"
-        />
-      );
+      return <AIReviewQueueScreen />;
     case 'continuity-map':
       return (
         <PlaceholderScreen
