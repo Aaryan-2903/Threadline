@@ -11,10 +11,10 @@ import type {
   NodeDetail,
   HandoverReport,
 } from '../types';
-import { isValidUUID } from '../utils/uuid';
+import { isValidUUID } from '../utils/uuid.ts';
 
-const VITE_API_URL = import.meta.env.VITE_API_URL;
-const API_BASE = VITE_API_URL
+const VITE_API_URL = import.meta.env?.VITE_API_URL;
+export const API_BASE = VITE_API_URL
   ? `${VITE_API_URL.replace(/\/$/, '')}/api/v1`
   : '/api/v1';
 
@@ -44,7 +44,7 @@ export const api = {
   // Projects
   async getProjects(): Promise<Project[]> {
     try {
-      return await fetchJson<Project[]>(`${API_BASE}/projects`);
+      return await fetchJson<Project[]>(`${API_BASE}/projects/`);
     } catch (e) {
       console.warn('Failed to fetch projects from API:', e);
       return [];
@@ -61,7 +61,7 @@ export const api = {
   },
 
   async createProject(data: { name: string; description?: string }): Promise<Project> {
-    return fetchJson<Project>(`${API_BASE}/projects`, {
+    return fetchJson<Project>(`${API_BASE}/projects/`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -90,7 +90,7 @@ export const api = {
       if (params?.status) searchParams.append('status', params.status);
       if (params?.priority) searchParams.append('priority', params.priority);
       const query = searchParams.toString();
-      const url = query ? `${API_BASE}/tasks?${query}` : `${API_BASE}/tasks`;
+      const url = query ? `${API_BASE}/tasks/?${query}` : `${API_BASE}/tasks/`;
       return await fetchJson<Task[]>(url);
     } catch (e) {
       console.warn('Failed to fetch tasks from API:', e);
@@ -132,7 +132,7 @@ export const api = {
     due_date?: string;
     actor?: string;
   }): Promise<Task> {
-    return fetchJson<Task>(`${API_BASE}/tasks`, {
+    return fetchJson<Task>(`${API_BASE}/tasks/`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -171,7 +171,7 @@ export const api = {
         searchParams.append('project_id', params.project_id);
       }
       const query = searchParams.toString();
-      const url = query ? `${API_BASE}/decisions?${query}` : `${API_BASE}/decisions`;
+      const url = query ? `${API_BASE}/decisions/?${query}` : `${API_BASE}/decisions/`;
       return await fetchJson<Decision[]>(url);
     } catch (e) {
       console.warn('Failed to fetch decisions from API:', e);
@@ -207,7 +207,7 @@ export const api = {
     decision_date?: string;
     actor?: string;
   }): Promise<Decision> {
-    return fetchJson<Decision>(`${API_BASE}/decisions`, {
+    return fetchJson<Decision>(`${API_BASE}/decisions/`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -247,7 +247,7 @@ export const api = {
       if (params?.order) searchParams.append('order', params.order);
       if (params?.limit) searchParams.append('limit', String(params.limit));
       const query = searchParams.toString();
-      const url = query ? `${API_BASE}/activities?${query}` : `${API_BASE}/activities`;
+      const url = query ? `${API_BASE}/activities/?${query}` : `${API_BASE}/activities/`;
       return await fetchJson<Activity[]>(url);
     } catch (e) {
       console.warn('Failed to fetch activities from API:', e);
@@ -293,8 +293,8 @@ export const api = {
   async getDocuments(projectId?: string): Promise<DocumentItem[]> {
     try {
       const url = projectId && isValidUUID(projectId)
-        ? `${API_BASE}/documents?project_id=${projectId}`
-        : `${API_BASE}/documents`;
+        ? `${API_BASE}/documents/?project_id=${projectId}`
+        : `${API_BASE}/documents/`;
       return await fetchJson<DocumentItem[]>(url);
     } catch (e) {
       console.warn('Failed to fetch documents from API:', e);
@@ -341,7 +341,7 @@ export const api = {
       if (params?.status) searchParams.append('status', params.status);
       if (params?.category) searchParams.append('category', params.category);
       const query = searchParams.toString();
-      const url = query ? `${API_BASE}/reviews?${query}` : `${API_BASE}/reviews`;
+      const url = query ? `${API_BASE}/reviews/?${query}` : `${API_BASE}/reviews/`;
       return await fetchJson<ExtractedClaim[]>(url);
     } catch (e) {
       console.warn('Failed to fetch reviews from API:', e);
@@ -469,8 +469,8 @@ export const api = {
   async getHandoverReports(projectId?: string): Promise<HandoverReport[]> {
     try {
       const url = projectId && isValidUUID(projectId)
-        ? `${API_BASE}/reports?project_id=${projectId}`
-        : `${API_BASE}/reports`;
+        ? `${API_BASE}/reports/?project_id=${projectId}`
+        : `${API_BASE}/reports/`;
       return await fetchJson<HandoverReport[]>(url);
     } catch (e) {
       console.warn('Failed to fetch handover reports:', e);
