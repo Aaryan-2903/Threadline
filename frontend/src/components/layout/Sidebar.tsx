@@ -3,6 +3,7 @@ import { useNavigation } from '../../context/useNavigation';
 import { useUserProfile } from '../../context/useUserProfile';
 import { useAuth } from '../../context/useAuth';
 import type { ScreenId } from '../../types';
+import threadlineLogo from '../../assets/threadline-logo.png';
 
 export const Sidebar: React.FC = () => {
   const { currentScreen, navigate, workspaceName } = useNavigation();
@@ -31,15 +32,15 @@ export const Sidebar: React.FC = () => {
         {/* Brand Header */}
         <div className="h-14 px-space-md flex items-center justify-between shadow-[0_1px_0_0_#ebedf9]">
           <div
-            className="flex items-center gap-space-sm min-w-0 cursor-pointer"
+            className="flex items-center gap-space-sm min-w-0 cursor-pointer py-1"
             onClick={() => navigate('overview')}
+            title="Threadline — Knowledge Continuity Platform"
           >
-            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-on-primary font-bold text-xs">
-              TL
-            </div>
-            <span className="font-headline-sm text-headline-sm text-on-surface tracking-tight truncate">
-              Threadline
-            </span>
+            <img
+              src={threadlineLogo}
+              alt="Threadline Logo"
+              className="h-7 w-auto max-w-[160px] object-contain rounded-md"
+            />
           </div>
           <button
             className="p-space-xs rounded text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors cursor-pointer"

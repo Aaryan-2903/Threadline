@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/threadline-github-logo.png" alt="Threadline Official Logo" width="160" />
+</p>
+
 # Threadline
 
 **Never lose the context behind the work.**

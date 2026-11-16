@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/useAuth';
 import { useNavigation } from '../context/useNavigation';
 import type { UserRole } from '../types';
+import threadlineLogo from '../assets/threadline-logo.png';
 
 interface PresetAccount {
   label: string;
@@ -104,13 +105,12 @@ export const LoginScreen: React.FC = () => {
       <div className="w-full max-w-lg space-y-6">
         {/* Brand & Round 3 Evaluation Banner */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center gap-2 mb-1">
-            <div className="w-9 h-9 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold text-base shadow-sm">
-              TL
-            </div>
-            <span className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">
-              Threadline
-            </span>
+          <div className="inline-flex items-center justify-center mb-1">
+            <img
+              src={threadlineLogo}
+              alt="Threadline"
+              className="h-11 sm:h-12 w-auto object-contain rounded-xl shadow-md"
+            />
           </div>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">
             AI-Powered Project Knowledge Continuity &amp; Handover Platform
