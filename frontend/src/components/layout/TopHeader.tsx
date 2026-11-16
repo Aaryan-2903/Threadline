@@ -199,7 +199,7 @@ export const TopHeader: React.FC = () => {
             className="w-7 h-7 rounded-full bg-primary hover:bg-primary-container text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0 ml-1 cursor-pointer transition-colors shadow-xs"
             title={`Signed in as ${user?.username || 'User'} (${user?.role || 'Guest'}) — Click to view settings`}
           >
-            {user ? user.username.slice(0, 2).toUpperCase() : initials}
+            {user ? (user.is_demo ? 'DJ' : user.username.slice(0, 2).toUpperCase()) : initials}
           </div>
         </div>
       </header>

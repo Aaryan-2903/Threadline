@@ -127,3 +127,43 @@ def test_contributor_cannot_resolve_conflict(client, db_session):
         assert resolve_res.status_code == 403
         assert "requires 'project_owner' or 'admin'" in resolve_res.json()["detail"]
 
+
+def test_demo_user_role_and_cannot_escalate(client):
+    # 1. Login with demo-login
+    res = client.post("/api/v1/auth/demo-login")
+    assert res.status_code == 200
+    demo_data = res.json()
+    assert demo_data["user"]["username"] == "demojudge"
+    assert demo_data["user"]["email"] == "demo@threadline.io"
+    assert demo_data["user"]["role"] == "project_owner"
+    demo_token = demo_data["access_token"]
+    demo_user_id = demo_data["user"]["id"]
+
+    # 2. Verify /me endpoint
+    me_res = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {demo_token}"},
+    )
+    assert me_res.status_code == 200
+    me_data = me_res.json()
+    assert me_data["username"] == "demojudge"
+    assert me_data["role"] == "project_owner"
+
+    # 3. Attempt to escalate role to admin using demo token -> MUST FAIL (403 Forbidden)
+    patch_role_res = client.patch(
+        f"/api/v1/auth/users/{demo_user_id}/role",
+        json={"role": "admin"},
+        headers={"Authorization": f"Bearer {demo_token}"},
+    )
+    assert patch_role_res.status_code == 403
+    assert "Only administrators can change user roles" in patch_role_res.json()["detail"]
+
+    # 4. Confirm role remains project_owner
+    me_res_after = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {demo_token}"},
+    )
+    assert me_res_after.status_code == 200
+    assert me_res_after.json()["role"] == "project_owner"
+
+

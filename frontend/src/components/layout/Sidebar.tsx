@@ -197,11 +197,11 @@ export const Sidebar: React.FC = () => {
             title="Click to view and personalize profile"
           >
             <div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0">
-              {user ? user.username.slice(0, 2).toUpperCase() : initials}
+              {user ? (user.is_demo ? 'DJ' : user.username.slice(0, 2).toUpperCase()) : initials}
             </div>
             <div className="min-w-0 flex-1 leading-tight">
               <p className="font-label-md text-label-md text-on-surface font-medium truncate group-hover:text-primary transition-colors">
-                {user ? user.username : (profile.displayName || 'User')}
+                {user ? (user.is_demo ? 'Demo Judge' : user.username) : (profile.displayName || 'User')}
               </p>
               <p className="font-label-sm text-label-sm text-outline truncate text-[11px] uppercase">
                 {user ? user.role.replace('_', ' ') : (profile.role || 'Personal Profile')}

@@ -15,7 +15,7 @@ interface PresetAccount {
 
 const PRESET_ACCOUNTS: PresetAccount[] = [
   {
-    label: 'Judge Demo Owner',
+    label: 'Demo Judge (Owner)',
     role: 'project_owner',
     email: 'demo@threadline.io',
     pass: 'demo123',
@@ -159,7 +159,7 @@ export const LoginScreen: React.FC = () => {
               )}
             </button>
             <p className="text-[11px] text-center text-outline mt-2 font-medium">
-              Assigned Role: <span className="font-bold text-indigo-700">Project Owner</span> (Marcus Vance)
+              Assigned Role: <span className="font-bold text-indigo-700">Project Owner</span> (Demo Judge • demojudge)
             </p>
           </div>
 

@@ -139,12 +139,12 @@ def change_user_role(
 ) -> UserResponse:
     """
     Update a user's role.
-    Allowed for Admins, or for Demo users to test role switching during evaluation.
+    Strictly restricted to administrators.
     """
-    if current_user.role != UserRole.ADMIN and not current_user.is_demo:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators or active demo sessions can change user roles.",
+            detail="Only administrators can change user roles.",
         )
 
     updated = user_service.update_user_role(db=db, user_id=user_id, new_role=role_in.role)

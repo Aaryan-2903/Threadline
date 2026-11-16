@@ -109,6 +109,23 @@ def seed_default_users_and_demo(db: Session) -> User:
             db.add(user)
             db.commit()
             db.refresh(user)
+        else:
+            changed = False
+            if user.role != role:
+                user.role = role
+                changed = True
+            if user.username != username:
+                user.username = username
+                changed = True
+            if user.is_demo != is_demo:
+                user.is_demo = is_demo
+                changed = True
+            if not user.is_active:
+                user.is_active = True
+                changed = True
+            if changed:
+                db.commit()
+                db.refresh(user)
         if is_demo:
             demo_user = user
 

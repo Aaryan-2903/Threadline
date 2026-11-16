@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { MetricCard } from '../components/common/MetricCard';
 import { api } from '../api/client';
@@ -9,6 +10,7 @@ import type { Project, Task, Decision, DocumentItem, ExtractedClaim } from '../t
 export const OverviewScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
 
   const [taskFilter, setTaskFilter] = useState<'all' | 'blocked' | 'high'>('all');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -113,7 +115,7 @@ export const OverviewScreen: React.FC = () => {
               <span className="text-primary font-medium">CodersInPune Hackathon</span>
             </div>
             <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              {greeting}, {profile.displayName || 'User'}
+              {greeting}, {user ? (user.is_demo ? 'Demo Judge' : user.username) : (profile.displayName || 'User')}
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant">
               {projects.length === 0
