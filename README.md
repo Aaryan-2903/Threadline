@@ -41,7 +41,8 @@ Threadline is an AI-powered project knowledge continuity and handover platform t
 14. [Security Considerations & Limitations](#security-considerations--limitations)
 15. [Team ALT-F4](#team-alt-f4)
 16. [Round 3 Implemented Capabilities](#round-3-implemented-capabilities)
-17. [License & Acknowledgements](#license--acknowledgements)
+17. [Future Roadmap](#future-roadmap)
+18. [License & Acknowledgements](#license--acknowledgements)
 
 ---
 
@@ -160,29 +161,47 @@ The user interface is built as a single-page application using React 19, TypeScr
 
 | Screen | Description | Primary Route |
 | :--- | :--- | :--- |
-| **Overview Dashboard** | Cross-project continuity metrics, quick actions, recent project cards, and activity timeline. | `/` |
+| **Overview Dashboard** | Cross-project continuity metrics, quick actions, recent project cards, and real-time activity timeline. | `/` |
 | **Project Workspace** | Tabbed workspace for managing tasks, decisions, timeline, documents, and review items for a specific project. | `/projects/:id` |
-| **Document Ingestion** | Upload dropzone for technical specifications with real-time extraction status and re-processing controls. | `/documents` |
-| **AI Review Queue** | Human review queue displaying evidence snippets, confidence meters, and approval buttons. | `/reviews` |
-| **Continuity Map** | Interactive network graph displaying node dependencies, orphan nodes, and blocking paths. | `/continuity` |
-| **Handover Reports** | Handover report generator with successor assignment and PDF export. | `/reports` |
-| **Settings** | User profile personalization, role selection, and display settings. | `/settings` |
+| **Document Ingestion** | Upload dropzone for technical specifications with magic-byte validation, extraction status, and re-processing controls. | `/documents` |
+| **AI Review Queue** | Human-in-the-loop review queue displaying evidence snippets, confidence meters, and atomic approval buttons. | `/reviews` |
+| **Continuity Map** | Interactive NetworkX graph displaying node dependencies, orphan nodes, decider paths, and blocking chains. | `/continuity` |
+| **Conflicts & Discrepancies** | Multi-vector conflict detection displaying contradictory claims, superseded decisions, and side-by-side evidence. | `/conflicts` |
+| **Handover Reports** | Handover dossier synthesis with successor assignment, version history, acknowledgement tracking, and PDF export. | `/reports` |
+| **Settings & Role Switcher** | Profile customization and 4-tier role switcher (`Admin`, `Project Owner`, `Contributor`, `Viewer`) for instant RBAC evaluation. | `/settings` |
+| **Viewer Mode** | Dedicated read-only role view with mutation locks, non-intrusive banner notices, and clean permission handling. | Global / All Screens |
 
 ### Screenshot Gallery
 
-Authentic screenshots are placed in the [`docs/screenshots/`](docs/screenshots/) directory.
+Authentic screenshots captured from the live application are available in [`docs/screenshots/`](docs/screenshots/):
 
-| Dashboard & Overview | Project Workspace |
-| :---: | :---: |
-| ![Dashboard Overview](docs/screenshots/overview-dashboard.png)<br>*(Placeholder — see [`docs/screenshots/README.md`](docs/screenshots/README.md))* | ![Project Workspace](docs/screenshots/project-workspace.png)<br>*(Placeholder — see [`docs/screenshots/README.md`](docs/screenshots/README.md))* |
+#### 1. Overview Dashboard
+![Overview Dashboard](docs/screenshots/overview-dashboard.png)
+*Cross-project continuity health metrics, quick actions, recent project cards, and chronological activity timeline.*
 
-| AI Review Queue | Continuity Map |
-| :---: | :---: |
-| ![AI Review Queue](docs/screenshots/ai-review-queue.png)<br>*(Placeholder — see [`docs/screenshots/README.md`](docs/screenshots/README.md))* | ![Continuity Map](docs/screenshots/continuity-map.png)<br>*(Placeholder — see [`docs/screenshots/README.md`](docs/screenshots/README.md))* |
+#### 2. Project Workspace
+![Project Workspace](docs/screenshots/project-workspace.png)
+*Unified tabbed workspace managing tasks, architectural decision records (ADRs), timeline events, documents, and pending reviews.*
 
-| Handover Report Generation | Document Ingestion |
-| :---: | :---: |
-| ![Handover Report](docs/screenshots/handover-report.png)<br>*(Placeholder — see [`docs/screenshots/README.md`](docs/screenshots/README.md))* | ![Document Upload](docs/screenshots/document-upload.png)<br>*(Placeholder — see [`docs/screenshots/README.md`](docs/screenshots/README.md))* |
+#### 3. AI Review Queue
+![AI Review Queue](docs/screenshots/ai-review-queue.png)
+*Human-in-the-loop staging queue displaying extracted knowledge claims, confidence meters, source page citations, and atomic approval controls.*
+
+#### 4. Relational Continuity Map
+![Continuity Map](docs/screenshots/continuity-map.png)
+*Interactive NetworkX dependency graph highlighting blocking chains, decision-task links, and orphan project assets.*
+
+#### 5. Handover Report & Redaction Shield
+![Handover Report](docs/screenshots/handover-report.png)
+*Synthesized 11-section handover dossier featuring successor assignment, acknowledgement tracking, and one-click sensitive data redaction.*
+
+#### 6. Conflict Detection & Resolution
+![Conflict Detection](docs/screenshots/conflicts.png)
+*Automated contradiction engine highlighting superseded decisions, task deadline discrepancies, and side-by-side evidence inspection.*
+
+#### 7. Viewer Mode (Read-Only RBAC)
+![Viewer Mode](docs/screenshots/viewer-mode.png)
+*Graceful read-only experience for Viewer accounts, featuring non-intrusive warning banners and mutation button locks.*
 
 ---
 
@@ -196,11 +215,13 @@ flowchart TB
 
     subgraph FE["Frontend — Vercel"]
         UI["React 19 + TypeScript + Vite"]
-        SC["Application Screens"]
-        API["API Client (Trailing-Slash Normalization)"]
-        CTX["Context Providers (Navigation, UserProfile)"]
+        SC["Application Screens (Dashboard, Workspace, Reports, Conflicts)"]
+        AUTH_CTX["AuthContext (JWT Session & 1-Click Demo Access)"]
+        RBAC["RBAC & Viewer Guards (ReadOnlyBanner & 403 ApiError Handling)"]
+        API["API Client (Bearer Token & Trailing-Slash Normalization)"]
         UI --> SC
-        SC --> CTX
+        SC --> AUTH_CTX
+        SC --> RBAC
         SC --> API
     end
 
@@ -208,33 +229,42 @@ flowchart TB
         FAST["FastAPI Application (ASGI)"]
         MW["Middleware (CORS Whitelist, Rate Limiter)"]
         ROUTES["REST API Routers (/api/v1/*)"]
+        AUTH_DEP["Security Dependencies (OAuth2 Bearer, Role Verification)"]
         
         subgraph SERVICES["Business Logic Services"]
+            USER_SVC["UserService (Direct bcrypt Hashing, Seed Data)"]
             PS["ProjectService"]
             TS["TaskService"]
             DS["DecisionService"]
             AS["ActivityService"]
+            CONFLICT_SVC["ConflictService (Multi-Vector Contradictions)"]
+            REDACT_SVC["RedactionService (PII & API Token Masking)"]
             DOCS["DocumentService"]
             EXTRACT["DocumentExtractionService (PyMuPDF / python-docx)"]
             AI["AIKnowledgeService (Gemini / OpenAI / Heuristic)"]
             REV["ReviewService (Idempotent Approvals)"]
             GRAPH["ContinuityService (NetworkX)"]
-            REPORT["ReportService (11-Section Synthesis)"]
+            REPORT["ReportService & Handover Lifecycle (11-Section Synthesis)"]
+            AUDIT["AuditLog Service (Immutable Activity Records)"]
         end
 
         FAST --> MW
-        MW --> ROUTES
+        MW --> AUTH_DEP
+        AUTH_DEP --> ROUTES
         ROUTES --> SERVICES
         DOCS --> EXTRACT
         DOCS --> AI
         REV --> TS
         REV --> DS
         REV --> AS
+        REPORT --> REDACT_SVC
+        DOCS --> REDACT_SVC
+        ROUTES --> AUDIT
     end
 
     subgraph DB["Database — Supabase (ap-south-1)"]
         PG[("PostgreSQL 15+ / Session Pooler")]
-        MODELS["projects, tasks, decisions, activities"]
+        MODELS["projects, tasks, decisions, activities, conflicts, audit_logs, users"]
         DOC_DATA["documents, extracted_knowledge, handover_reports"]
         MIGRATIONS["alembic_version"]
         PG --- MODELS
@@ -249,7 +279,7 @@ flowchart TB
     end
 
     U -->|"HTTPS"| UI
-    API -->|"REST / JSON"| FAST
+    API -->|"REST / JSON + Bearer JWT"| FAST
     SERVICES -->|"SQLAlchemy 2.0 (psycopg 3)"| PG
     AI -.->|"x-goog-api-key"| GEM
     AI -.->|"Bearer Token"| OAI
@@ -258,13 +288,14 @@ flowchart TB
 
 ### Architectural Layer Responsibilities
 
-1. **Frontend (Vercel):** Pure client-side SPA. Manages screen navigation, form validation, modal state, graph rendering, and API communication. Never handles API keys or credentials directly.
-2. **Security & Rate Limiting Middleware:**
+1. **Frontend (Vercel):** Pure client-side Single-Page Application. Manages screen navigation, authenticated JWT sessions, role-based UI states (including non-intrusive Viewer notices), form validations, interactive NetworkX graph visual rendering, and API communication. Never embeds API secrets in client bundles.
+2. **Security, Auth & Rate Limiting Middleware:**
+   - **JWT Authentication & RBAC (`app.core.security`, `app.api.deps`):** Validates signed `HS256` Bearer tokens, enforces password hashing with direct `bcrypt`, and authorizes requests across 4 permission tiers (`Admin`, `Project Owner`, `Contributor`, `Viewer`).
    - **CORS Whitelist:** Explicitly allows only configured frontend origins; forbids wildcards in production and when credentials are enabled.
    - **Sliding-Window Rate Limiter:** Protects public endpoints from flooding (120 req/min for general routes, 15 req/min for expensive AI/document upload routes) with trusted proxy verification.
-3. **Application & Routing Layer (FastAPI on Render):** Handles request validation via Pydantic schemas, dependency injection for database sessions, and structured HTTP error responses.
-4. **Business Services Layer:** Encapsulates domain logic, atomic transactions, idempotency guards, and data transformations.
-5. **Database Storage Layer (Supabase PostgreSQL):** Persists normalized relational data and binary document content with foreign key constraints and cascade rules.
+3. **Application & Routing Layer (FastAPI on Render):** Handles request validation via Pydantic schemas, dependency injection for database sessions, role gating, and structured HTTP error responses.
+4. **Business Services Layer:** Encapsulates domain logic, multi-vector conflict detection, atomic promotions, PII/secret redaction, handover lifecycle transitions, and immutable audit logging.
+5. **Database Storage Layer (Supabase PostgreSQL):** Persists normalized relational data, binary document blobs, and audit trails with foreign key constraints, cascade rules, and connection pool recycling.
 6. **Optional AI Layer:** Dispatches extraction prompts to external LLMs when configured; switches to local heuristics when unconfigured or exhausted.
 
 ---
@@ -314,7 +345,21 @@ erDiagram
     PROJECTS ||--o{ DOCUMENTS : "cascades delete"
     PROJECTS ||--o{ EXTRACTED_KNOWLEDGE : "cascades delete"
     PROJECTS ||--o{ HANDOVER_REPORTS : "cascades delete"
+    PROJECTS ||--o{ CONFLICTS : "cascades delete"
+    PROJECTS ||--o{ AUDIT_LOGS : "cascades delete"
     DOCUMENTS ||--o{ EXTRACTED_KNOWLEDGE : "cascades delete"
+
+    USERS {
+        uuid id PK
+        string email
+        string username
+        string hashed_password
+        string role
+        boolean is_active
+        boolean is_demo
+        timestamp created_at
+        timestamp updated_at
+    }
 
     PROJECTS {
         uuid id PK
@@ -404,8 +449,50 @@ erDiagram
         string status
         text content_json
         string generated_by
+        integer version
+        string outgoing_owner
+        string incoming_owner
+        string incoming_owner_role
+        string acknowledgement_status
+        text clarification_notes
+        timestamp sent_at
+        timestamp acknowledged_at
         timestamp created_at
         timestamp updated_at
+    }
+
+    CONFLICTS {
+        uuid id PK
+        uuid project_id FK
+        string conflict_type
+        string severity
+        string title
+        text description
+        string source_entity_type
+        uuid source_entity_id
+        string target_entity_type
+        uuid target_entity_id
+        text evidence_snippet
+        string status
+        string resolved_by
+        text resolution_notes
+        timestamp resolved_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid user_id
+        string username
+        string user_role
+        uuid project_id FK
+        string action
+        string resource_type
+        uuid resource_id
+        text details
+        string ip_address
+        timestamp timestamp
     }
 ```
 
@@ -431,61 +518,86 @@ Threadline/
 │   ├── README.md                # Dedicated backend technical documentation
 │   ├── alembic/
 │   │   ├── env.py               # Dynamic Alembic environment loader
-│   │   └── versions/
-│   │       └── 28a2fd0b3a90_initial_schema.py  # Initial migration revision
+│   │   └── versions/            # Database schema migration revisions
 │   ├── app/
 │   │   ├── main.py              # FastAPI app instance, CORS, rate limiting, lifespan
 │   │   ├── database.py          # SQLAlchemy engine, session factory, init_db
-│   │   ├── api/routes/          # Route handlers
-│   │   │   ├── projects.py      # Project routes & nested resources
-│   │   │   ├── tasks.py         # Standalone task CRUD & filtering
-│   │   │   ├── decisions.py     # Standalone decision CRUD
-│   │   │   ├── activities.py    # Activity timeline retrieval
-│   │   │   ├── documents.py     # Document upload & processing
-│   │   │   ├── reviews.py       # Knowledge claims review queue
-│   │   │   ├── continuity.py    # Relational graph analytics
-│   │   │   └── reports.py       # Handover report generation & PDF export
+│   │   ├── api/
+│   │   │   ├── deps.py          # Auth dependencies, JWT token extraction, RBAC guards
+│   │   │   └── routes/          # REST API route handlers
+│   │   │       ├── auth.py          # Demo login, standard login, users, role admin
+│   │   │       ├── projects.py      # Project routes & nested resources
+│   │   │       ├── tasks.py         # Standalone task CRUD & filtering
+│   │   │       ├── decisions.py     # Standalone decision CRUD
+│   │   │       ├── conflicts.py     # Conflict detection & resolution
+│   │   │       ├── audit_logs.py    # Immutable system & project audit trails
+│   │   │       ├── activities.py    # Activity timeline retrieval
+│   │   │       ├── documents.py     # Document upload, extraction & PII scan
+│   │   │       ├── reviews.py       # Knowledge claims review queue
+│   │   │       ├── continuity.py    # Relational graph analytics
+│   │   │       └── reports.py       # Handover report generation, lifecycle & PDF export
 │   │   ├── core/
 │   │   │   ├── config.py        # Pydantic Settings & environment validation
+│   │   │   ├── security.py      # JWT encoding/decoding & bcrypt direct hashing
 │   │   │   └── rate_limiter.py  # Sliding-window rate limiting middleware
 │   │   ├── models/              # SQLAlchemy ORM model definitions
-│   │   │   ├── project.py
-│   │   │   ├── task.py
-│   │   │   ├── decision.py
-│   │   │   ├── activity.py
-│   │   │   ├── document.py
-│   │   │   ├── extracted_knowledge.py
-│   │   │   └── report.py
-│   │   ├── schemas/             # Pydantic input/output schemas with length constraints
+│   │   │   ├── user.py          # User accounts, hashed passwords & 4-tier roles
+│   │   │   ├── project.py       # Project workspaces
+│   │   │   ├── task.py          # Operational tasks & assignments
+│   │   │   ├── decision.py      # Architectural decision records (ADRs)
+│   │   │   ├── conflict.py      # Contradictions, superseded decisions, discrepancies
+│   │   │   ├── audit_log.py     # Append-only security & mutation audit trail
+│   │   │   ├── activity.py      # Entity lifecycle activities
+│   │   │   ├── document.py      # Ingested technical specifications
+│   │   │   ├── extracted_knowledge.py # Candidate claims awaiting verification
+│   │   │   └── report.py        # Handover dossiers, versions & acknowledgements
+│   │   ├── schemas/             # Pydantic validation schemas with bounds
 │   │   └── services/            # Business logic services
-│   │       ├── project_service.py
-│   │       ├── task_service.py
-│   │       ├── decision_service.py
-│   │       ├── activity_service.py
-│   │       ├── document_service.py
-│   │       ├── extraction_service.py
-│   │       ├── ai_service.py
-│   │       ├── review_service.py
-│   │       ├── continuity_service.py
-│   │       └── report_service.py
-│   └── tests/                   # Pytest test suite (133 tests)
+│   │       ├── user_service.py      # Auth logic, password verification, demo provisioning
+│   │       ├── project_service.py   # Workspace CRUD & cascades
+│   │       ├── task_service.py      # Task lifecycle management
+│   │       ├── decision_service.py  # ADR tracking & rationale recording
+│   │       ├── conflict_service.py  # Multi-vector contradiction detection engine
+│   │       ├── redaction_service.py # PII, email, phone & API key masking shield
+│   │       ├── activity_service.py  # Activity logging
+│   │       ├── document_service.py  # Document ingestion & storage
+│   │       ├── extraction_service.py# Magic-byte safe parsing (PyMuPDF / python-docx)
+│   │       ├── ai_service.py        # LLM extraction & deterministic heuristic fallback
+│   │       ├── review_service.py    # Idempotent claim verification & atomic approval
+│   │       ├── continuity_service.py# NetworkX relational continuity graph
+│   │       └── report_service.py    # 11-section synthesis, versioning & PDF export
+│   └── tests/                   # Pytest test suite (149 passed tests across 14 modules)
 ├── frontend/
 │   ├── package.json             # Frontend dependencies & npm scripts
 │   ├── vite.config.ts           # Vite bundler configuration & local API proxy
 │   ├── tsconfig.json            # TypeScript configuration
 │   ├── src/
-│   │   ├── App.tsx              # Root component & screen routing
+│   │   ├── App.tsx              # Root component & role-aware screen routing
 │   │   ├── api/
-│   │   │   └── client.ts        # Typed API client with trailing-slash normalization
-│   │   ├── components/layout/   # Navigation bar, header, layout containers
-│   │   ├── context/             # NavigationContext and UserProfileContext
-│   │   ├── screens/             # Dedicated screen views
+│   │   │   └── client.ts        # Typed API client, trailing-slash normalization, ApiError
+│   │   ├── components/
+│   │   │   ├── common/          # ReadOnlyBanner and shared UI widgets
+│   │   │   └── layout/          # TopHeader, Sidebar navigation, layout wrappers
+│   │   ├── context/             # AuthContext, NavigationContext, UserProfileContext
+│   │   ├── screens/             # Dedicated application screens
+│   │   │   ├── LoginScreen.tsx          # Credentials login & 1-click Judge Demo Access
+│   │   │   ├── OverviewScreen.tsx       # Cross-project portfolio & health metrics
+│   │   │   ├── ProjectWorkspaceScreen.tsx # Tabbed workspace (Tasks, ADRs, Timeline)
+│   │   │   ├── ConflictsScreen.tsx      # Conflict triage & side-by-side evidence
+│   │   │   ├── HandoverReportsScreen.tsx# Dossier generator, successor sign-off, PDF
+│   │   │   ├── AIReviewQueueScreen.tsx  # Evidence verification & claim promotion
+│   │   │   ├── ContinuityMapScreen.tsx  # Interactive NetworkX dependency graph
+│   │   │   ├── DocumentsScreen.tsx      # File dropzone & sensitive scan inspector
+│   │   │   └── SettingsScreen.tsx       # Profile personalization & 4-tier role switcher
 │   │   ├── types/               # TypeScript interface definitions
 │   │   └── utils/               # UUID validation and formatting helpers
-│   └── tests/
-│       └── client.test.ts       # Frontend API client URL construction tests (16 tests)
+│   └── tests/                   # Frontend test suite (31 passed tests across 3 modules)
+│       ├── client.test.ts           # API URL formatting & 403 error parsing (16 tests)
+│       ├── auth.test.ts             # JWT decoding & token lifecycle (9 tests)
+│       └── viewer_and_403.test.ts   # Viewer read-only & permission guards (6 tests)
 ├── docs/
-│   └── screenshots/             # Interface screenshot directory
+│   ├── assets/                  # Official brand logos and graphics
+│   └── screenshots/             # 7 authentic interface screenshots for submission
 └── scripts/
     ├── start-backend.js         # Cross-platform backend development runner
     └── test-backend.js          # Cross-platform pytest test runner
@@ -611,9 +723,9 @@ This starts both the FastAPI backend and Vite frontend simultaneously:
 | `npm run dev:frontend` | Project root | Starts Vite frontend development server standalone. |
 | `npm run build` | Project root | Compiles TypeScript and builds production frontend bundle. |
 | `npm run lint` | Project root | Runs `oxlint` across all frontend source files. |
-| `npm run test:backend` | Project root | Runs full pytest suite (133 tests) via virtual environment. |
-| `npm run test:frontend` | Project root | Runs frontend URL construction tests (16 tests). |
-| `npm run test` | Project root | Executes both backend and frontend test suites sequentially. |
+| `npm run test:backend` | Project root | Runs full pytest suite (149 tests across 14 modules) via virtual environment. |
+| `npm run test:frontend` | Project root | Runs full frontend test suite (31 tests across client, auth, viewer & 403 handling). |
+| `npm run test` | Project root | Executes both backend and frontend test suites sequentially (180 total tests). |
 
 ---
 
@@ -690,10 +802,10 @@ Threadline maintains automated test suites across both the backend and frontend.
 
 | Test Suite | Tests Run | Result | Execution Time |
 | :--- | :--- | :--- | :--- |
-| **Backend Suite (`pytest`)** | 142 tests | **142 Passed**, 0 Failed, 30 warnings | ~115 seconds |
-| **Frontend Suite (`node --test`)** | 19 tests | **19 Passed**, 0 Failed | ~0.17 seconds |
-| **Frontend Linter (`oxlint`)** | 38 source files | **0 Errors**, 2 warnings | ~0.19 seconds |
-| **Production Build (`tsc -b && vite build`)** | Full frontend bundle | **Build Succeeded** | ~0.35 seconds |
+| **Backend Suite (`pytest`)** | 149 tests | **149 Passed**, 0 Failed | ~139 seconds |
+| **Frontend Suite (`node --test`)** | 31 tests | **31 Passed**, 0 Failed | ~0.25 seconds |
+| **Frontend Linter (`oxlint`)** | 39 source files | **0 Errors**, 2 warnings | ~0.19 seconds |
+| **Production Build (`tsc -b && vite build`)** | Full frontend bundle | **Build Succeeded** | ~0.32 seconds |
 
 ### Backend Test Coverage Areas
 1. **Activity Timeline (`test_activities.py`):** Entity creation triggers, status changes, idempotent no-op handling, timeline ordering, cascade deletions.
@@ -709,6 +821,12 @@ Threadline maintains automated test suites across both the backend and frontend.
 11. **Conflict Detection Engine (`test_conflicts.py`):** Idempotent detection of contradictory claims, superseded architectural decisions, conflicting task deadlines/assignees, resolution status tracking (`open`, `resolved`, `dismissed`).
 12. **Sensitive Data Redaction Shield (`test_redaction_and_sensitive_data.py`):** Automated masking of API keys (`sk-...`, `AIza...`, `ghp_...`, Bearer tokens), emails, phone numbers, recursive JSON structure redaction.
 13. **Handover Lifecycle & Acknowledgement (`test_handover_lifecycle.py`):** State transitions (`draft` -> `pending` -> `acknowledged` / `clarification_requested`), clarification notes, version history snapshots.
+14. **Round 3 End-to-End Verification (`test_round3_e2e_verification.py`):** Multi-service integration testing verifying Judge Demo Access, RBAC role restrictions across endpoints, conflict resolution persistence, sensitive data masking across reports, and complete handover acknowledgement lifecycle state transitions.
+
+### Frontend Test Coverage Areas
+1. **API Client & Normalization (`client.test.ts` — 16 tests):** Trailing-slash normalization, query parameter serialization, HTTP error status mapping, and `ApiError` structured parsing.
+2. **Authentication & Token Lifecycle (`auth.test.ts` — 9 tests):** JWT token decoding, role claim extraction, Bearer header attachment, and `localStorage` session persistence.
+3. **Viewer Mode & RBAC UI Guards (`viewer_and_403.test.ts` — 6 tests):** Viewer read-only restrictions, non-intrusive warning banner display, mutation lockouts, and human-readable 403 error parsing without raw JSON/brackets.
 
 ---
 
@@ -768,52 +886,72 @@ flowchart LR
 
 Developed for the **CodersInPune Hackathon Round 2 & Round 3**:
 
-- **Aryan Mandal** — Team Lead & Full-Stack / Frontend Developer
-- **Atharva Patil** — Full-Stack Developer
-- **Parikshit Arbad** — Backend & Systems Architect
-- **Janhavi Gaud** — UI/UX & QA Engineer
+- **Aryan Mandal** — Team Lead, Backend Development, Testing, Deployment and overall project development.
+- **Atharva Patil** — Frontend Development.
+- **Parikshit Arbad** — Research and Testing.
+- **Janhavi Gaud** — Research.
 
 ---
 
 ## Round 3 Implemented Capabilities
 
-All three improvements promised in the Round 2 submission have been fully designed, implemented end-to-end, and verified in both backend and frontend:
+All three improvements promised in the Round 2 submission have been designed, implemented end-to-end, and verified in both backend and frontend:
 
 ### 1. Advanced Conflict Detection and Resolution
-- **Multi-Vector Contradiction Engine:** Automatically scans project claims, architectural decisions, task assignees, and deadlines to identify conflicts.
-- **Superseded Decision Tracking:** Detects when newer ADRs replace or contradict earlier design choices and flags them as `superseded_decision`.
-- **Task Owner & Deadline Discrepancies:** Identifies conflicting deadlines between interdependent deliverables and conflicting ownership assignments across documentation.
-- **Side-by-Side Evidence Inspection:** Renders side-by-side opposing evidence snippets with verbatim text and document citations.
-- **Idempotent Scanning:** Re-running conflict detection updates open issues without overwriting existing resolutions or duplicate records.
-- **Resolution Lifecycle:** Tracks resolution statuses (`open`, `resolved`, `dismissed`) with resolution actor, timestamp, and audit notes.
+- **Multi-Vector Contradiction Engine (`backend/app/services/conflict_service.py`):** Automatically analyzes candidate claims, established architecture decisions, task assignees, and deadlines to identify conflicts across project artifacts.
+- **Superseded Decision Tracking:** Detects when newer architectural decisions supersede earlier technical choices (e.g., migration from monolithic to distributed caching) and flags them with category `superseded_decision`.
+- **Task Owner & Deadline Discrepancies:** Identifies conflicting deadlines between interdependent deliverables and mismatched ownership assignments across documentation.
+- **Side-by-Side Evidence Inspection:** Renders side-by-side opposing evidence snippets with verbatim excerpt text and source document citations in `ConflictsScreen.tsx`.
+- **Idempotent Scanning (`POST /api/v1/projects/{id}/conflicts/detect`):** Re-running conflict detection updates open issues without duplicating records or overwriting existing resolutions.
+- **Resolution Lifecycle:** Tracks resolution statuses (`open`, `resolved`, `dismissed`) with resolution actor, timestamp, resolution rationale notes, and immutable audit logging.
 
 ### 2. Role-Based Access Control & Sensitive Data Protection
-- **JWT Authentication & Direct bcrypt Hashing:** Signed Bearer tokens with 4 distinct permission tiers:
-  - **Admin:** Full access across all workspaces, user role administration, and system audit logs.
-  - **Project Owner:** Complete control over assigned projects, conflict resolution, document uploads, and handover generation.
-  - **Contributor:** Read and edit tasks and decisions; cannot resolve conflicts or delete projects.
-  - **Viewer:** Strict read-only access across all endpoints; mutations return HTTP 403 Forbidden.
-- **Sensitive Data Redaction Shield:** Real-time regex detection and masking of API keys (`sk-...`, `AIza...`, `ghp_...`, Bearer tokens), personal email addresses, and phone numbers.
-- **Interactive Redaction Toggle:** Handover reports and document views feature a one-click Redaction Shield toggle with real-time preview and export masking.
-- **Immutable Audit Trail:** Append-only log recording actor, timestamp, IP address, resource ID, action type, and details.
+- **JWT Authentication & Direct bcrypt Hashing (`backend/app/core/security.py`):** Signed Bearer tokens (`HS256`) and cryptographically secure password hashing enforcing four distinct permission tiers:
+  - **Admin:** Complete system-wide oversight, cross-workspace visibility, role administration (`PATCH /api/v1/auth/users/{id}/role`), and access to immutable system audit trails.
+  - **Project Owner:** Full authority over assigned workspaces, conflict resolution, document uploads, and handover generation.
+  - **Contributor:** Operational access to create and edit tasks and decisions; restricted from resolving conflicts or deleting project workspaces.
+  - **Viewer:** Strict read-only access across all endpoints; mutation requests return HTTP 403 Forbidden.
+- **Viewer Mode UI Experience (`frontend/src/components/common/ReadOnlyBanner.tsx`):** Gracefully informs read-only users with clear contextual notices, hides/locks restricted mutation buttons, prevents unintended auto-generation triggers, and cleanly parses 403 error responses into user-friendly messages without displaying raw JSON or brackets.
+- **Sensitive Data Redaction Shield (`backend/app/services/redaction_service.py`):** Automated regex pattern matching detecting API secrets (`sk-...`, `AIza...`, `ghp_...`, Bearer tokens), personal email addresses, and phone numbers.
+- **Dynamic Redaction (`?redact=true`):** Real-time masking toggle across document and handover report endpoints, live UI preview, and PDF export masking.
+- **Immutable Audit Trail (`backend/app/models/audit_log.py`):** Append-only log recording actor, timestamp, IP address, resource ID, action type, and details.
 
 ### 3. Handover Lifecycle & Acknowledgement Tracking
-- **Explicit Successor Assignment:** Outgoing owner and incoming owner assignment with dedicated role attribution.
+- **Explicit Successor Assignment:** Structured assignment of outgoing owner and incoming successor with dedicated role attribution.
 - **Lifecycle State Machine:**
-  - `draft`: Initial working handover report.
-  - `pending`: Outgoing owner sends handover for formal review.
-  - `acknowledged`: Incoming owner completes verification and officially signs off on ownership transfer.
+  - `draft`: Initial working handover dossier synthesized from project state.
+  - `pending`: Outgoing owner dispatches handover for formal review and sign-off.
+  - `acknowledged`: Incoming owner completes verification and officially records formal sign-off.
   - `clarification_requested`: Incoming owner requests clarifications with structured feedback notes.
-- **Version History & Snapshotting:** Explicit version incrementation (`v1`, `v2`, `v3...`) preserving historical handover state across milestones.
-- **Incomplete Tasks & Handover Impact:** Visual tracking of pending/blocked tasks and their handover risk score.
+- **Version History & Snapshotting:** Explicit version incrementation (`v1`, `v2`, `v3...`) preserving historical handover state across transitions.
+- **Incomplete Tasks & Handover Risk Impact:** Real-time visibility into pending/blocked tasks and their handover risk score.
 
 ### 4. Judge One-Click Demo Access
-- **Instant Demo Evaluation:** A dedicated "Judge Demo Access" action in the top navigation bar logs in as `demojudge` with one click via `/api/v1/auth/demo-login`.
-- **Pre-Populated Demo Workspace:** Automatically provisions the "Acme Cloud Platform Migration" project featuring realistic architectural decisions, cross-document conflicts, active tasks, ingested documents, and an audit trail ready for inspection.
-- **Demo Credentials:**
-  - **Username:** `demojudge` (or `admin`)
-  - **Password:** `demo123` (or `admin123`)
-  - Role switcher allows rapid switching between `Admin`, `Project Owner`, `Contributor`, and `Viewer` to evaluate permissions in real-time.
+- **Zero-Credential Evaluation:** Judges can evaluate the live platform with a single click via the **"Judge Demo Access"** button on the login screen or in the top navigation bar.
+- **Automated Demo Provisioning (`POST /api/v1/auth/demo-login`):** Authenticates the session as Project Owner (username: `demojudge`, email: `demo@threadline.io`) without requiring judges to enter manual passwords or credentials.
+- **Pre-Populated Demo Workspace:** Automatically provisions the "Acme Cloud Platform Migration" project featuring realistic architectural decisions, cross-document conflicts, active tasks, ingested technical specifications, and an audit trail ready for inspection.
+- **Real-Time Role Switcher:** The Settings screen includes an interactive role switcher allowing judges to instantly test and verify permissions across all four roles (`Admin`, `Project Owner`, `Contributor`, `Viewer`) without logging out.
+
+---
+
+## Future Roadmap
+
+Threadline's core architecture was designed for enterprise extensibility. The following capabilities distinguish planned future enhancements from currently implemented features:
+
+| Capability | Status | Description |
+| :--- | :--- | :--- |
+| **Evidence-Backed Knowledge Extraction** | **Implemented** | Automated PDF/DOCX parsing with Gemini, OpenAI, or deterministic local fallback. |
+| **Human-in-the-Loop Review Queue** | **Implemented** | Staging queue with confidence meters, page citations, and atomic promotion. |
+| **Relational Continuity Map** | **Implemented** | NetworkX dependency graph with orphan detection and blocker identification. |
+| **Advanced Conflict Detection** | **Implemented** | Multi-vector scanner for superseded ADRs, task deadlines, and contradictory claims. |
+| **4-Tier RBAC & Sensitive Data Shield**| **Implemented** | JWT auth, bcrypt hashing, viewer mode locks, PII/secret redaction, and audit logs. |
+| **Handover Lifecycle & Sign-Off** | **Implemented** | Multi-state acknowledgement flow (`draft` -> `pending` -> `acknowledged`), versioning. |
+| **One-Click Judge Demo Access** | **Implemented** | Instant zero-credential authentication with pre-populated evaluation workspace. |
+| **Bidirectional Git & Jira Sync** | *Planned (Q2)* | Webhook listeners to automatically ingest pull requests, commits, and Jira issue transitions. |
+| **Hybrid Vector & Semantic Search** | *Planned (Q2)* | Integration with PostgreSQL `pgvector` for natural-language semantic query retrieval across corpus. |
+| **Granular Custom Role Builder** | *Planned (Q3)* | Enterprise role creation allowing organization-level custom permission sets beyond 4 fixed tiers. |
+| **Enterprise Graph Scalability** | *Planned (Q3)* | Distributed graph clustering and community detection for workspaces exceeding 10,000+ nodes. |
+| **Automated Compliance Dossiers** | *Planned (Q4)* | Exportable SOC 2 and ISO 27001 audit packs verifying knowledge continuity and sign-offs. |
 
 ---
 
