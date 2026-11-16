@@ -2,12 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { isValidUUID } from '../utils/uuid';
 import type { DocumentItem, Project } from '../types';
 
 export const DocumentsScreen: React.FC = () => {
   const { navigate, selectedProjectId } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
 
   const validProjectId = isValidUUID(selectedProjectId) ? selectedProjectId : undefined;
 
@@ -201,6 +205,13 @@ export const DocumentsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full pb-16">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing documents in read-only mode. Ingestion, upload, and deletion require Contributor or higher role."
+        />
+      )}
+
       <div className="px-space-xl py-space-lg flex flex-col gap-space-lg">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-space-md">
@@ -213,101 +224,107 @@ export const DocumentsScreen: React.FC = () => {
           <div className="flex items-center gap-space-sm shrink-0">
             <button
               onClick={() => navigate('ai-review-queue')}
-              className="h-8 px-space-md rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm border border-outline-variant/30"
+              className="h-8 px-space-md rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm border border-outline-variant/30 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px] text-on-surface-variant">smart_toy</span>
               <span>Open AI Review Queue</span>
             </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={(e) => {
-                if (e.target.files && e.target.files.length > 0) {
-                  handleFileUpload(e.target.files[0]);
-                }
-              }}
-              accept=".pdf,.docx"
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">upload_file</span>
-              <span>{isUploading ? 'Ingesting...' : 'Upload Document'}</span>
-            </button>
+            {!isViewer && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFileUpload(e.target.files[0]);
+                    }
+                  }}
+                  accept=".pdf,.docx"
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">upload_file</span>
+                  <span>{isUploading ? 'Ingesting...' : 'Upload Document'}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Upload & Ingestion Dropzone Banner */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`p-space-lg rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all relative overflow-hidden border-2 ${
-            isDragging
-              ? 'border-primary-container bg-primary-fixed/20'
-              : 'border-dashed border-outline-variant/50 hover:border-primary-container'
-          }`}
-        >
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md">
-            <div className="flex items-center gap-space-md min-w-0">
-              <div className="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary-container shrink-0">
-                <span className="material-symbols-outlined text-[26px]">
-                  {isUploading ? 'hourglass_top' : 'cloud_upload'}
-                </span>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-headline-sm text-headline-sm text-on-surface font-semibold truncate">
-                    Drag &amp; drop technical specifications, RFCs, PRDs, or architecture notes
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-surface-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider font-semibold">
-                    Max 50MB
+        {/* Upload & Ingestion Dropzone Banner (Hidden for Read-Only Viewers) */}
+        {!isViewer && (
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`p-space-lg rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all relative overflow-hidden border-2 ${
+              isDragging
+                ? 'border-primary-container bg-primary-fixed/20'
+                : 'border-dashed border-outline-variant/50 hover:border-primary-container'
+            }`}
+          >
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md">
+              <div className="flex items-center gap-space-md min-w-0">
+                <div className="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary-container shrink-0">
+                  <span className="material-symbols-outlined text-[26px]">
+                    {isUploading ? 'hourglass_top' : 'cloud_upload'}
                   </span>
                 </div>
-                <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
-                  Documents are automatically OCR-indexed, extracted for ADRs &amp; handover commitments, and anchored with page citations.
-                </p>
-                {uploadError && (
-                  <p className="font-label-sm text-label-sm text-error mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">error</span>
-                    {uploadError}
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-headline-sm text-headline-sm text-on-surface font-semibold truncate">
+                      Drag &amp; drop technical specifications, RFCs, PRDs, or architecture notes
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-surface-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider font-semibold">
+                      Max 50MB
+                    </span>
+                  </div>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                    Documents are automatically OCR-indexed, extracted for ADRs &amp; handover commitments, and anchored with page citations.
                   </p>
-                )}
+                  {uploadError && (
+                    <p className="font-label-sm text-label-sm text-error mt-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">error</span>
+                      {uploadError}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-space-sm shrink-0 w-full md:w-auto justify-end">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-8 px-space-md rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">folder_open</span>
+                  <span>Browse local files</span>
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-space-sm shrink-0 w-full md:w-auto justify-end">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="h-8 px-space-md rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">folder_open</span>
-                <span>Browse local files</span>
-              </button>
+
+            {/* Pipeline Features Tags */}
+            <div className="mt-space-md pt-space-sm flex flex-wrap items-center gap-2 bg-surface-container-low/40 px-space-sm py-1.5 rounded-lg">
+              <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold flex items-center gap-1 mr-2">
+                <span className="material-symbols-outlined text-[14px]">verified</span> Pipeline Features:
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
+                <span className="material-symbols-outlined text-[14px] text-primary-container">picture_as_pdf</span> PDF supported
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
+                <span className="material-symbols-outlined text-[14px] text-tertiary-container">description</span> DOCX supported
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
+                <span className="material-symbols-outlined text-[14px] text-tertiary">document_scanner</span> Page-level citations
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
+                <span className="material-symbols-outlined text-[14px] text-primary">auto_fix_high</span> Semantic AI Knowledge Engine
+              </span>
             </div>
           </div>
-
-          {/* Pipeline Features Tags */}
-          <div className="mt-space-md pt-space-sm flex flex-wrap items-center gap-2 bg-surface-container-low/40 px-space-sm py-1.5 rounded-lg">
-            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold flex items-center gap-1 mr-2">
-              <span className="material-symbols-outlined text-[14px]">verified</span> Pipeline Features:
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
-              <span className="material-symbols-outlined text-[14px] text-primary-container">picture_as_pdf</span> PDF supported
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
-              <span className="material-symbols-outlined text-[14px] text-tertiary-container">description</span> DOCX supported
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
-              <span className="material-symbols-outlined text-[14px] text-tertiary">document_scanner</span> Page-level citations
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm shadow-sm">
-              <span className="material-symbols-outlined text-[14px] text-primary">auto_fix_high</span> Semantic AI Knowledge Engine
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Summary Metrics Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
@@ -658,22 +675,24 @@ export const DocumentsScreen: React.FC = () => {
                     <span>Review {selectedDoc.extracted_claims_count} Claims in Review Queue</span>
                   </button>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleReprocessDocument(selectedDoc.id)}
-                      className="flex-1 h-8 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">sync</span>
-                      <span>Reprocess</span>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDocument(selectedDoc.id)}
-                      className="flex-1 h-8 rounded bg-error-container/40 hover:bg-error-container text-error font-label-sm text-label-sm font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                      <span>Delete File</span>
-                    </button>
-                  </div>
+                  {!isViewer && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleReprocessDocument(selectedDoc.id)}
+                        className="flex-1 h-8 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">sync</span>
+                        <span>Reprocess</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDocument(selectedDoc.id)}
+                        className="flex-1 h-8 rounded bg-error-container/40 hover:bg-error-container text-error font-label-sm text-label-sm font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        <span>Delete File</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Proof Anchor & Preview Box */}

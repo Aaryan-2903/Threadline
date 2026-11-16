@@ -3,12 +3,16 @@ import type { Task, Project, TaskStatus, TaskPriority } from '../types';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 
 type TabFilter = 'all' | 'unfinished' | 'blockers' | 'overdue' | 'completed';
 
 export const MyTasksScreen: React.FC = () => {
   const { navigateTo } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
   const [currentTimestamp] = useState(() => Date.now());
 
   // State
@@ -136,6 +140,7 @@ export const MyTasksScreen: React.FC = () => {
 
   // Task Actions
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    if (isViewer) return;
     try {
       const updated = await api.updateTask(
         taskId,
@@ -145,9 +150,9 @@ export const MyTasksScreen: React.FC = () => {
         profile.displayName || 'User'
       );
       setTasks(prev => prev.map(t => (t.id === taskId ? updated : t)));
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      alert('Failed to update task status in backend.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update task status in backend.';
+      setError(msg);
     }
   };
 
@@ -284,6 +289,13 @@ export const MyTasksScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing tasks in read-only mode. Task creation, status updates, and modifications require Contributor or higher role."
+        />
+      )}
+
       {/* Workstation Container */}
       <div className="p-space-xl flex flex-col gap-space-lg max-w-[1600px] mx-auto w-full">
         {/* 1. Header Area: Action-oriented cockpit header */}
@@ -321,14 +333,16 @@ export const MyTasksScreen: React.FC = () => {
               <span className="material-symbols-outlined text-[16px] text-on-surface-variant">file_download</span>
               <span>Export CSV</span>
             </button>
-            <button
-              onClick={openCreateModal}
-              className="h-8 px-3.5 rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Create Task</span>
-            </button>
+            {!isViewer && (
+              <button
+                onClick={openCreateModal}
+                className="h-8 px-3.5 rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span>Create Task</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -858,24 +872,26 @@ export const MyTasksScreen: React.FC = () => {
                         {selectedTask.title}
                       </h2>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEditModal(selectedTask)}
-                        className="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant transition-colors"
-                        title="Edit task"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTask(selectedTask.id)}
-                        className="w-7 h-7 rounded hover:bg-error-container/40 flex items-center justify-center text-error transition-colors"
-                        title="Delete task"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                      </button>
-                    </div>
+                    {!isViewer && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditModal(selectedTask)}
+                          className="w-7 h-7 rounded hover:bg-surface-container flex items-center justify-center text-on-surface-variant transition-colors"
+                          title="Edit task"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTask(selectedTask.id)}
+                          className="w-7 h-7 rounded hover:bg-error-container/40 flex items-center justify-center text-error transition-colors"
+                          title="Delete task"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Section: Description & Diagnostic Note */}

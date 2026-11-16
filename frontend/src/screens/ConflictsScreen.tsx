@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuth } from '../context/useAuth';
 import { useNavigation } from '../context/useNavigation';
 import { AuditTrailModal } from '../components/common/AuditTrailModal';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 
 export const ConflictsScreen: React.FC = () => {
   const { selectedProjectId: navProjectId } = useNavigation();
@@ -132,6 +133,7 @@ export const ConflictsScreen: React.FC = () => {
   const dismissedCount = conflicts.filter((c) => c.status === 'dismissed').length;
 
   const userRole = user?.role;
+  const isViewer = userRole === 'viewer';
   const canResolve = Boolean(userRole && (userRole === 'admin' || userRole === 'project_owner'));
 
   const getTypeLabel = (type: string) => {
@@ -179,6 +181,14 @@ export const ConflictsScreen: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing conflicts in read-only mode. Conflict detection scans and resolutions require Contributor, Project Owner, or Admin privileges."
+          className="rounded-xl border shadow-xs"
+        />
+      )}
+
       {/* Top Banner & Title */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
         <div>
@@ -207,25 +217,27 @@ export const ConflictsScreen: React.FC = () => {
             </svg>
             View Audit Log
           </button>
-          <button
-            onClick={handleDetect}
-            disabled={detecting || !selectedProjectId}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            {detecting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Scanning Evidence...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Scan & Detect Conflicts
-              </>
-            )}
-          </button>
+          {!isViewer && (
+            <button
+              onClick={handleDetect}
+              disabled={detecting || !selectedProjectId}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              {detecting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Scanning Evidence...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Scan & Detect Conflicts
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

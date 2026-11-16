@@ -3,10 +3,14 @@ import type { Decision, Project } from '../types';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 
 export const DecisionsScreen: React.FC = () => {
   const { navigateTo } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
 
   // State
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -245,6 +249,13 @@ export const DecisionsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing architectural decisions in read-only mode. Recording or editing ADRs requires Contributor or higher role."
+        />
+      )}
+
       {/* Top Command & Action Bar */}
       <div className="px-space-xl pt-space-lg pb-space-md bg-surface-container-lowest border-b border-outline-variant/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
@@ -276,14 +287,16 @@ export const DecisionsScreen: React.FC = () => {
               <span className="material-symbols-outlined text-[16px] text-on-surface-variant">download</span>
               <span>Export ADR Catalog</span>
             </button>
-            <button
-              onClick={openCreateModal}
-              className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Record Decision</span>
-            </button>
+            {!isViewer && (
+              <button
+                onClick={openCreateModal}
+                className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span>Record Decision</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -766,22 +779,24 @@ export const DecisionsScreen: React.FC = () => {
                       <span>Copy Permanent URI</span>
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => openEditModal(selectedDecision)}
-                      className="px-2.5 py-1 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md font-medium transition-colors border border-outline-variant/30"
-                      type="button"
-                    >
-                      Edit Rationale
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDecision(selectedDecision.id)}
-                      className="px-2.5 py-1 rounded bg-surface-container-low hover:bg-error-container/40 text-error font-label-md text-label-md font-medium transition-colors border border-outline-variant/30"
-                      type="button"
-                    >
-                      Delete ADR
-                    </button>
-                  </div>
+                  {!isViewer && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEditModal(selectedDecision)}
+                        className="px-2.5 py-1 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md font-medium transition-colors border border-outline-variant/30 cursor-pointer"
+                        type="button"
+                      >
+                        Edit Rationale
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDecision(selectedDecision.id)}
+                        className="px-2.5 py-1 rounded bg-surface-container-low hover:bg-error-container/40 text-error font-label-md text-label-md font-medium transition-colors border border-outline-variant/30 cursor-pointer"
+                        type="button"
+                      >
+                        Delete ADR
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

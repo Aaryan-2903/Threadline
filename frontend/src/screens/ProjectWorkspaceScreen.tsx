@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/useNavigation';
+import { useAuth } from '../context/useAuth';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { api } from '../api/client';
@@ -8,6 +9,9 @@ import type { Project, Task, Decision, DocumentItem, Activity, ConflictItem } fr
 
 export const ProjectWorkspaceScreen: React.FC = () => {
   const { selectedProjectId, setSelectedProjectId, navigate } = useNavigation();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
+  const canResolve = Boolean(user && (user.role === 'admin' || user.role === 'project_owner'));
 
   const [project, setProject] = useState<Project | null>(null);
   const [projectsList, setProjectsList] = useState<Project[]>([]);
@@ -500,14 +504,16 @@ export const ProjectWorkspaceScreen: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleRunConflictScan}
-                  className="px-3 h-8 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md cursor-pointer flex items-center gap-1.5 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[16px]">sync</span>
-                  <span>Scan Now</span>
-                </button>
+                {!isViewer && (
+                  <button
+                    type="button"
+                    onClick={handleRunConflictScan}
+                    className="px-3 h-8 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md cursor-pointer flex items-center gap-1.5 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">sync</span>
+                    <span>Scan Now</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate('conflicts')}
@@ -561,7 +567,7 @@ export const ProjectWorkspaceScreen: React.FC = () => {
                         <p className="text-xs text-on-surface-variant leading-relaxed">{conflict.description}</p>
                       </div>
 
-                      {conflict.status === 'open' && (
+                      {conflict.status === 'open' && canResolve && (
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             type="button"

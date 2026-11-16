@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { api } from '../api/client';
 import type { Project, Task, Decision, DocumentItem } from '../types';
 
 export const MyProjectsScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
+  const canManageProjects = Boolean(user && (user.role === 'admin' || user.role === 'project_owner'));
 
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'archived'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +111,13 @@ export const MyProjectsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full pb-16">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing projects in read-only mode. Workspace creation and deletion require Project Owner or Admin authority."
+        />
+      )}
+
       {/* Top Command & Action Bar */}
       <div className="w-full bg-surface-container-lowest px-space-xl py-space-lg shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-md">
@@ -169,15 +181,17 @@ export const MyProjectsScreen: React.FC = () => {
               </button>
             </div>
 
-            {/* Primary CTA */}
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="h-8 px-3 rounded bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Create Project</span>
-            </button>
+            {/* Primary CTA (Hidden for Viewers) */}
+            {!isViewer && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="h-8 px-3 rounded bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span>Create Project</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -349,14 +363,16 @@ export const MyProjectsScreen: React.FC = () => {
                             >
                               Open
                             </button>
-                            <button
-                              onClick={(e) => handleDeleteProject(proj.id, e)}
-                              className="h-7 w-7 rounded hover:bg-error-container/20 text-outline hover:text-error transition-colors flex items-center justify-center cursor-pointer"
-                              type="button"
-                              title="Delete project"
-                            >
-                              <span className="material-symbols-outlined text-[15px]">delete</span>
-                            </button>
+                            {canManageProjects && (
+                              <button
+                                onClick={(e) => handleDeleteProject(proj.id, e)}
+                                className="h-7 w-7 rounded hover:bg-error-container/20 text-outline hover:text-error transition-colors flex items-center justify-center cursor-pointer"
+                                type="button"
+                                title="Delete project"
+                              >
+                                <span className="material-symbols-outlined text-[15px]">delete</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -386,14 +402,16 @@ export const MyProjectsScreen: React.FC = () => {
                   <div className="space-y-space-xs">
                     <div className="flex items-center justify-between">
                       <StatusBadge variant={proj.status} />
-                      <button
-                        onClick={(e) => handleDeleteProject(proj.id, e)}
-                        className="text-outline hover:text-error p-1 rounded"
-                        title="Delete project"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                      </button>
+                      {canManageProjects && (
+                        <button
+                          onClick={(e) => handleDeleteProject(proj.id, e)}
+                          className="text-outline hover:text-error p-1 rounded"
+                          title="Delete project"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                      )}
                     </div>
 
                     <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors font-semibold truncate pt-1">

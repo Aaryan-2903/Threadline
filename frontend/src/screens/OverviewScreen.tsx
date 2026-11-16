@@ -11,6 +11,7 @@ export const OverviewScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const { profile } = useUserProfile();
   const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
 
   const [taskFilter, setTaskFilter] = useState<'all' | 'blocked' | 'high'>('all');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -132,16 +133,18 @@ export const OverviewScreen: React.FC = () => {
               type="button"
             >
               <span className="material-symbols-outlined text-[16px] text-outline">description</span>
-              <span>Generate Handover</span>
+              <span>{isViewer ? 'Handover Reports' : 'Generate Handover'}</span>
             </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded bg-primary text-on-primary font-label-md text-label-md shadow-xs hover:bg-primary-container transition-colors cursor-pointer"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Create Project</span>
-            </button>
+            {!isViewer && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded bg-primary text-on-primary font-label-md text-label-md shadow-xs hover:bg-primary-container transition-colors cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span>Create Project</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -48,6 +48,59 @@ export function getAuthToken(): string | null {
   return currentAuthToken;
 }
 
+export class ApiError extends Error {
+  status: number;
+  data: unknown;
+  isForbidden: boolean;
+
+  constructor(status: number, message: string, data?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    this.isForbidden = status === 403;
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
+async function parseErrorResponse(response: Response, defaultPrefix = 'API Error'): Promise<never> {
+  let detailMsg = '';
+  let parsedData: unknown = null;
+  try {
+    const errorText = await response.text();
+    try {
+      parsedData = JSON.parse(errorText);
+      if (parsedData && typeof parsedData === 'object' && 'detail' in (parsedData as Record<string, unknown>)) {
+        const detail = (parsedData as Record<string, unknown>).detail;
+        if (typeof detail === 'string') {
+          detailMsg = detail;
+        } else if (Array.isArray(detail)) {
+          detailMsg = detail
+            .map((item: unknown) => {
+              if (item && typeof item === 'object' && 'msg' in (item as Record<string, unknown>)) {
+                return String((item as Record<string, unknown>).msg);
+              }
+              return JSON.stringify(item);
+            })
+            .join(', ');
+        }
+      }
+    } catch {
+      detailMsg = errorText;
+    }
+  } catch {
+    detailMsg = response.statusText;
+  }
+
+  if (response.status === 403) {
+    const forbiddenMsg = detailMsg || "You're viewing this workspace in read-only mode and do not have permission to perform this action.";
+    throw new ApiError(403, forbiddenMsg, parsedData);
+  }
+
+  const cleanMsg = detailMsg ? `${detailMsg}` : `${defaultPrefix} ${response.status}`;
+  throw new ApiError(response.status, cleanMsg, parsedData);
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const token = getAuthToken();
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
@@ -62,8 +115,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`API Error ${response.status}: ${errorBody}`);
+    await parseErrorResponse(response);
   }
 
   // Handle 204 No Content
@@ -462,8 +514,7 @@ export const api = {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Upload Error ${response.status}: ${errorBody}`);
+      await parseErrorResponse(response, 'Upload');
     }
 
     return response.json();

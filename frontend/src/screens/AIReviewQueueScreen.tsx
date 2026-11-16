@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { isValidUUID } from '../utils/uuid';
 import type { ExtractedClaim } from '../types';
 
 export const AIReviewQueueScreen: React.FC = () => {
   const { selectedProjectId, navigate } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
 
   const validProjectId = isValidUUID(selectedProjectId) ? selectedProjectId : undefined;
 
@@ -165,6 +169,13 @@ export const AIReviewQueueScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full pb-16">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing the AI review queue in read-only mode. Approving, modifying, or rejecting extracted claims requires Contributor or higher role."
+        />
+      )}
+
       {/* Top Command & Action Bar */}
       <section className="w-full bg-surface-container-lowest px-space-xl py-space-lg flex flex-col md:flex-row md:items-center justify-between gap-space-md border-b border-outline-variant/20">
         <div className="flex flex-col min-w-0">
@@ -188,14 +199,16 @@ export const AIReviewQueueScreen: React.FC = () => {
             <span className="material-symbols-outlined text-[16px] text-on-surface-variant">refresh</span>
             <span>Refresh</span>
           </button>
-          <button
-            onClick={handleApproveAll}
-            disabled={isProcessingAction || pendingCount === 0}
-            className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-[16px]">done_all</span>
-            <span>Approve All High-Confidence ({pendingCount})</span>
-          </button>
+          {!isViewer && (
+            <button
+              onClick={handleApproveAll}
+              disabled={isProcessingAction || pendingCount === 0}
+              className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[16px]">done_all</span>
+              <span>Approve All High-Confidence ({pendingCount})</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -536,48 +549,50 @@ export const AIReviewQueueScreen: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Action Controls */}
-                  <div className="mt-space-lg pt-space-md bg-surface-container-low/50 -mx-space-lg -mb-space-lg px-space-lg py-space-sm flex items-center justify-between">
-                    <div className="flex items-center gap-space-xs">
-                      {claim.status !== 'approved' && (
+                  {/* Action Controls (Restricted to Write Roles) */}
+                  {!isViewer && (
+                    <div className="mt-space-lg pt-space-md bg-surface-container-low/50 -mx-space-lg -mb-space-lg px-space-lg py-space-sm flex items-center justify-between">
+                      <div className="flex items-center gap-space-xs">
+                        {claim.status !== 'approved' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApprove(claim.id);
+                            }}
+                            disabled={isProcessingAction}
+                            className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">check</span>
+                            <span>Approve &amp; Ratify</span>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleApprove(claim.id);
+                            handleStartEdit(claim);
+                          }}
+                          className="h-8 px-space-md rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md inline-flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[16px] text-on-surface-variant">edit</span>
+                          <span>Edit Details</span>
+                        </button>
+                      </div>
+
+                      {claim.status !== 'rejected' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReject(claim.id);
                           }}
                           disabled={isProcessingAction}
-                          className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                          className="h-8 px-space-sm rounded text-error hover:bg-error-container/30 font-label-md text-label-md inline-flex items-center gap-1 transition-colors cursor-pointer"
                         >
-                          <span className="material-symbols-outlined text-[16px]">check</span>
-                          <span>Approve &amp; Ratify</span>
+                          <span className="material-symbols-outlined text-[16px]">close</span>
+                          <span>Reject Claim</span>
                         </button>
                       )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartEdit(claim);
-                        }}
-                        className="h-8 px-space-md rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md inline-flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[16px] text-on-surface-variant">edit</span>
-                        <span>Edit Details</span>
-                      </button>
                     </div>
-
-                    {claim.status !== 'rejected' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReject(claim.id);
-                        }}
-                        disabled={isProcessingAction}
-                        className="h-8 px-space-sm rounded text-error hover:bg-error-container/30 font-label-md text-label-md inline-flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
-                        <span>Reject Claim</span>
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </article>
               );
             })

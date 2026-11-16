@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { useNavigation } from '../context/useNavigation';
 import { useUserProfile } from '../context/useUserProfile';
+import { useAuth } from '../context/useAuth';
+import { ReadOnlyBanner } from '../components/common/ReadOnlyBanner';
 import { isValidUUID } from '../utils/uuid';
 import type { HandoverReport, Project } from '../types';
 
 export const HandoverReportsScreen: React.FC = () => {
   const { selectedProjectId, setSelectedProjectId, navigate } = useNavigation();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
+  const isViewer = user?.role === 'viewer';
 
   // State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -81,14 +85,24 @@ export const HandoverReportsScreen: React.FC = () => {
         setAllReports(reports || []);
         if (reports && reports.length > 0) {
           applyReportState(reports[0]);
-        } else {
-          // If no report generated yet, compile automatically
-          const actorName = profile.displayName || 'Aryan Mandal';
-          const newReport = await api.generateHandoverReport(activeProjectId, actorName);
-          if (isMounted) {
-            setAllReports([newReport]);
-            applyReportState(newReport);
+        } else if (!isViewer) {
+          // If no report generated yet, compile automatically for privileged roles
+          try {
+            const actorName = profile.displayName || user?.username || 'System Lead';
+            const newReport = await api.generateHandoverReport(activeProjectId, actorName);
+            if (isMounted) {
+              setAllReports([newReport]);
+              applyReportState(newReport);
+            }
+          } catch (genErr) {
+            console.warn('Auto-generation skipped:', genErr);
+            if (isMounted) {
+              applyReportState(null);
+            }
           }
+        } else {
+          // Viewer mode with no existing reports: display clean empty state
+          applyReportState(null);
         }
       } catch (err) {
         console.warn('Error loading reports:', err);
@@ -100,7 +114,7 @@ export const HandoverReportsScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeProjectId, profile.displayName, redactSensitive]);
+  }, [activeProjectId, profile.displayName, redactSensitive, isViewer, user?.username]);
 
   // Handover Lifecycle Action Handlers
   const handleSendAcknowledgement = async () => {
@@ -252,6 +266,13 @@ export const HandoverReportsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col w-full pb-20">
+      {/* Read-Only Notice for Viewers */}
+      {isViewer && (
+        <ReadOnlyBanner
+          message="You're viewing this workspace in read-only mode. You can inspect existing handover reports, but cannot generate or modify them."
+        />
+      )}
+
       {/* Top Command & Action Bar */}
       <section className="w-full bg-surface-container-lowest px-space-xl py-space-lg flex flex-col md:flex-row md:items-center justify-between gap-space-md border-b border-outline-variant/15 shadow-sm">
         <div className="flex flex-col min-w-0">
@@ -294,19 +315,23 @@ export const HandoverReportsScreen: React.FC = () => {
             </div>
           )}
 
-          <button
-            onClick={handleGenerateReport}
-            disabled={isGenerating}
-            className="h-8 px-space-md rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-[16px]">sync</span>
-            <span>{isGenerating ? 'Compiling Dossier...' : 'Regenerate Dossier'}</span>
-          </button>
+          {!isViewer && (
+            <button
+              onClick={handleGenerateReport}
+              disabled={isGenerating}
+              className="h-8 px-space-md rounded bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Compile or recompile the handover dossier"
+            >
+              <span className="material-symbols-outlined text-[16px]">sync</span>
+              <span>{isGenerating ? 'Compiling Dossier...' : 'Regenerate Dossier'}</span>
+            </button>
+          )}
 
           <button
             onClick={handleExportPdf}
             disabled={!currentReport}
             className="h-8 px-space-md rounded bg-primary-container hover:bg-primary text-on-primary transition-colors font-label-md text-label-md font-medium inline-flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+            title="Download verified PDF handover dossier"
           >
             <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
             <span>Export Official PDF</span>
@@ -336,49 +361,64 @@ export const HandoverReportsScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="flex items-center gap-1.5">
-            <input
-              type="text"
-              value={successorName}
-              onChange={(e) => setSuccessorName(e.target.value)}
-              placeholder="Incoming owner name..."
-              aria-label="Incoming successor name"
-              className="h-8 px-2.5 rounded bg-surface-container-low text-on-surface text-[12px] border border-outline-variant/30 focus:border-primary focus:bg-surface-container-lowest focus:outline-none w-44 transition-colors"
-            />
-            <input
-              type="text"
-              value={successorRole}
-              onChange={(e) => setSuccessorRole(e.target.value)}
-              placeholder="Role / Title (e.g. Lead SRE)..."
-              aria-label="Incoming successor role or title"
-              className="h-8 px-2.5 rounded bg-surface-container-low text-on-surface text-[12px] border border-outline-variant/30 focus:border-primary focus:bg-surface-container-lowest focus:outline-none w-44 transition-colors"
-            />
-          </div>
-
-          {currentReport && (
-            <button
-              onClick={handleSaveSuccessor}
-              disabled={isSavingSuccessor}
-              className="h-8 px-3 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-[12px] font-medium border border-outline-variant/30 shadow-xs cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[15px]">
-                {isSavingSuccessor ? 'hourglass_top' : 'save'}
+          {isViewer ? (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded bg-surface-container text-on-surface border border-outline-variant/30 font-medium">
+                Incoming: <strong>{successorName || 'Not assigned'}</strong>
               </span>
-              <span>{isSavingSuccessor ? 'Saving...' : 'Save Successor'}</span>
-            </button>
-          )}
+              {successorRole && (
+                <span className="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant border border-outline-variant/30">
+                  Role: <strong>{successorRole}</strong>
+                </span>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={successorName}
+                  onChange={(e) => setSuccessorName(e.target.value)}
+                  placeholder="Incoming owner name..."
+                  aria-label="Incoming successor name"
+                  className="h-8 px-2.5 rounded bg-surface-container-low text-on-surface text-[12px] border border-outline-variant/30 focus:border-primary focus:bg-surface-container-lowest focus:outline-none w-44 transition-colors"
+                />
+                <input
+                  type="text"
+                  value={successorRole}
+                  onChange={(e) => setSuccessorRole(e.target.value)}
+                  placeholder="Role / Title (e.g. Lead SRE)..."
+                  aria-label="Incoming successor role or title"
+                  className="h-8 px-2.5 rounded bg-surface-container-low text-on-surface text-[12px] border border-outline-variant/30 focus:border-primary focus:bg-surface-container-lowest focus:outline-none w-44 transition-colors"
+                />
+              </div>
 
-          {successorFeedback && (
-            <span
-              className={`text-[11px] font-medium inline-flex items-center gap-1 ${
-                successorFeedback.type === 'success' ? 'text-primary' : 'text-error'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]">
-                {successorFeedback.type === 'success' ? 'check_circle' : 'error'}
-              </span>
-              {successorFeedback.message}
-            </span>
+              {currentReport && (
+                <button
+                  onClick={handleSaveSuccessor}
+                  disabled={isSavingSuccessor}
+                  className="h-8 px-3 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-[12px] font-medium border border-outline-variant/30 shadow-xs cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[15px]">
+                    {isSavingSuccessor ? 'hourglass_top' : 'save'}
+                  </span>
+                  <span>{isSavingSuccessor ? 'Saving...' : 'Save Successor'}</span>
+                </button>
+              )}
+
+              {successorFeedback && (
+                <span
+                  className={`text-[11px] font-medium inline-flex items-center gap-1 ${
+                    successorFeedback.type === 'success' ? 'text-primary' : 'text-error'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {successorFeedback.type === 'success' ? 'check_circle' : 'error'}
+                  </span>
+                  {successorFeedback.message}
+                </span>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -468,48 +508,52 @@ export const HandoverReportsScreen: React.FC = () => {
               <span>{redactSensitive ? 'Shield Active: Redacted' : 'Mask Sensitive Data'}</span>
             </button>
 
-            {/* Lifecycle Action Buttons */}
-            {currentReport.acknowledgement_status === 'draft' && (
-              <button
-                onClick={handleSendAcknowledgement}
-                disabled={lifecycleLoading}
-                className="h-8 px-3.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">send</span>
-                <span>Send for Acknowledgement</span>
-              </button>
-            )}
-
-            {currentReport.acknowledgement_status === 'pending' && (
+            {/* Lifecycle Action Buttons (Restricted to Write Roles) */}
+            {!isViewer && (
               <>
-                <button
-                  onClick={handleAcknowledge}
-                  disabled={lifecycleLoading}
-                  className="h-8 px-3.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">verified</span>
-                  <span>Acknowledge & Sign Off</span>
-                </button>
-                <button
-                  onClick={() => setClarificationModalOpen(true)}
-                  disabled={lifecycleLoading}
-                  className="h-8 px-3 rounded border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">help</span>
-                  <span>Request Clarification</span>
-                </button>
-              </>
-            )}
+                {currentReport.acknowledgement_status === 'draft' && (
+                  <button
+                    onClick={handleSendAcknowledgement}
+                    disabled={lifecycleLoading}
+                    className="h-8 px-3.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">send</span>
+                    <span>Send for Acknowledgement</span>
+                  </button>
+                )}
 
-            {(currentReport.acknowledgement_status === 'clarification_requested' || currentReport.acknowledgement_status === 'acknowledged') && (
-              <button
-                onClick={handleCreateVersion}
-                disabled={lifecycleLoading}
-                className="h-8 px-3.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/30 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">add_circle</span>
-                <span>Create Revision (v{(currentReport.version || 1) + 1})</span>
-              </button>
+                {currentReport.acknowledgement_status === 'pending' && (
+                  <>
+                    <button
+                      onClick={handleAcknowledge}
+                      disabled={lifecycleLoading}
+                      className="h-8 px-3.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">verified</span>
+                      <span>Acknowledge & Sign Off</span>
+                    </button>
+                    <button
+                      onClick={() => setClarificationModalOpen(true)}
+                      disabled={lifecycleLoading}
+                      className="h-8 px-3 rounded border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">help</span>
+                      <span>Request Clarification</span>
+                    </button>
+                  </>
+                )}
+
+                {(currentReport.acknowledgement_status === 'clarification_requested' || currentReport.acknowledgement_status === 'acknowledged') && (
+                  <button
+                    onClick={handleCreateVersion}
+                    disabled={lifecycleLoading}
+                    className="h-8 px-3.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/30 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                    <span>Create Revision (v{(currentReport.version || 1) + 1})</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -634,9 +678,20 @@ export const HandoverReportsScreen: React.FC = () => {
       {/* Main Dossier Presentation Sheet */}
       <div className="px-space-xl py-space-lg flex justify-center">
         {error && (
-          <div className="w-full max-w-4xl p-4 mb-4 rounded-lg bg-error-container text-error flex items-center gap-2">
-            <span className="material-symbols-outlined">error</span>
-            <span>{error}</span>
+          <div className="w-full max-w-4xl p-3 mb-4 rounded-lg bg-surface-container-low border border-outline-variant/40 text-on-surface flex items-start gap-2.5 text-xs animate-fade-in shadow-xs">
+            <span className="material-symbols-outlined text-[18px] text-amber-600 shrink-0 mt-0.5">info</span>
+            <div className="flex-1">
+              <p className="font-semibold text-on-surface">Notice</p>
+              <p className="text-on-surface-variant leading-relaxed">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-outline hover:text-on-surface p-0.5 cursor-pointer"
+              title="Dismiss"
+            >
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            </button>
           </div>
         )}
 
@@ -916,25 +971,34 @@ export const HandoverReportsScreen: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="p-16 text-center text-on-surface-variant">
+          <div className="p-16 text-center text-on-surface-variant max-w-lg mx-auto">
             <span className="material-symbols-outlined text-[48px] block mb-2 text-outline">
               assignment_turned_in
             </span>
             <p className="font-headline-sm text-headline-sm text-on-surface font-semibold">
               {projects.length === 0 ? 'No Projects Available' : 'No Handover Report Generated Yet'}
             </p>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1 mb-4">
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1 mb-4 leading-relaxed">
               {projects.length === 0
                 ? 'Create a project in My Projects to begin capturing knowledge and compile official handover dossiers.'
+                : isViewer
+                ? 'This workspace has no compiled handover dossier yet. A Project Owner or Admin must generate the initial handover report.'
                 : 'Select a project and click "Compile Handover Dossier" to compile verified decisions, tasks, and ownership relays.'}
             </p>
             {projects.length === 0 ? (
-              <button
-                onClick={() => navigate('my-projects')}
-                className="px-4 py-2 rounded bg-primary text-on-primary font-medium shadow-sm hover:bg-primary-container transition-colors cursor-pointer"
-              >
-                Go to My Projects
-              </button>
+              !isViewer && (
+                <button
+                  onClick={() => navigate('my-projects')}
+                  className="px-4 py-2 rounded bg-primary text-on-primary font-medium shadow-sm hover:bg-primary-container transition-colors cursor-pointer"
+                >
+                  Go to My Projects
+                </button>
+              )
+            ) : isViewer ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-xs text-on-surface-variant border border-outline-variant/30 select-none">
+                <span className="material-symbols-outlined text-[15px] text-outline">lock</span>
+                <span>Awaiting generation by Project Owner or Admin</span>
+              </div>
             ) : (
               <button
                 onClick={handleGenerateReport}
