@@ -4,7 +4,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressBar } from '../components/common/ProgressBar';
 import { api } from '../api/client';
 import { isValidUUID } from '../utils/uuid';
-import type { Project, Task, Decision, DocumentItem, Activity } from '../types';
+import type { Project, Task, Decision, DocumentItem, Activity, ConflictItem } from '../types';
 
 export const ProjectWorkspaceScreen: React.FC = () => {
   const { selectedProjectId, setSelectedProjectId, navigate } = useNavigation();
@@ -15,9 +15,10 @@ export const ProjectWorkspaceScreen: React.FC = () => {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'decisions' | 'documents' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'decisions' | 'conflicts' | 'documents' | 'activity'>('overview');
 
   // Load project and associated knowledge
   useEffect(() => {
@@ -42,11 +43,12 @@ export const ProjectWorkspaceScreen: React.FC = () => {
         const currentProj = allProjects.find((p) => p.id === targetId) || allProjects[0];
         setProject(currentProj);
 
-        const [projTasks, projDecisions, projDocs, projActs] = await Promise.all([
-          api.getProjectTasks(currentProj.id),
-          api.getProjectDecisions(currentProj.id),
-          api.getDocuments(currentProj.id),
-          api.getProjectActivities(currentProj.id),
+        const [projTasks, projDecisions, projDocs, projActs, projConflicts] = await Promise.all([
+          api.getProjectTasks(currentProj.id).catch(() => []),
+          api.getProjectDecisions(currentProj.id).catch(() => []),
+          api.getDocuments(currentProj.id).catch(() => []),
+          api.getProjectActivities(currentProj.id).catch(() => []),
+          api.getConflicts(currentProj.id).catch(() => []),
         ]);
 
         if (!isMounted) return;
@@ -54,6 +56,7 @@ export const ProjectWorkspaceScreen: React.FC = () => {
         setDecisions(projDecisions || []);
         setDocuments(projDocs || []);
         setActivities(projActs || []);
+        setConflicts(projConflicts || []);
       } catch (err) {
         console.warn('Failed to load workspace data:', err);
       } finally {
@@ -106,7 +109,30 @@ export const ProjectWorkspaceScreen: React.FC = () => {
 
   const completedTasks = tasks.filter((t) => t.status === 'done');
   const blockedTasks = tasks.filter((t) => t.status === 'blocked');
+  const openConflicts = conflicts.filter((c) => c.status === 'open');
   const progressPercent = tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0;
+
+  const handleResolveConflict = async (conflictId: string, status: 'resolved' | 'dismissed') => {
+    try {
+      const updated = await api.resolveConflict(conflictId, {
+        status,
+        resolution_notes: status === 'resolved' ? 'Resolved directly in workspace' : 'Dismissed in workspace',
+      });
+      setConflicts((prev) => prev.map((c) => (c.id === conflictId ? updated : c)));
+    } catch (err) {
+      console.error('Failed to update conflict status:', err);
+    }
+  };
+
+  const handleRunConflictScan = async () => {
+    if (!project) return;
+    try {
+      const res = await api.detectConflicts(project.id);
+      setConflicts(res.conflicts || []);
+    } catch (err) {
+      console.error('Failed to run conflict scan:', err);
+    }
+  };
 
   return (
     <div className="flex flex-col w-full pb-16">
@@ -156,6 +182,28 @@ export const ProjectWorkspaceScreen: React.FC = () => {
               <span>Decisions</span>
               <span className="font-code-inline text-[11px] px-1.5 py-0.2 bg-surface-container-high text-on-surface-variant rounded">
                 {decisions.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('conflicts')}
+              className={`flex items-center gap-space-xs px-space-md py-2 font-label-md text-label-md rounded transition-colors cursor-pointer ${
+                activeTab === 'conflicts'
+                  ? 'bg-surface-container text-primary font-medium'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+              }`}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[16px]">crisis_alert</span>
+              <span>Conflicts</span>
+              <span
+                className={`font-code-inline text-[11px] px-1.5 py-0.2 rounded font-semibold ${
+                  openConflicts.length > 0
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                    : 'bg-surface-container-high text-on-surface-variant'
+                }`}
+              >
+                {openConflicts.length}
               </span>
             </button>
 
@@ -249,6 +297,17 @@ export const ProjectWorkspaceScreen: React.FC = () => {
                   <span className="material-symbols-outlined text-[14px]">warning</span>
                   <span>{blockedTasks.length} Blocked Tasks</span>
                 </div>
+              )}
+
+              {openConflicts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('conflicts')}
+                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300 font-label-sm text-[12px] hover:bg-amber-100 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-amber-700">crisis_alert</span>
+                  <span>{openConflicts.length} Active Conflicts</span>
+                </button>
               )}
             </div>
           </div>
@@ -422,6 +481,119 @@ export const ProjectWorkspaceScreen: React.FC = () => {
                     <h3 className="font-medium text-on-surface text-sm">{dec.title}</h3>
                     {dec.rationale && <p className="text-xs text-on-surface-variant line-clamp-2">{dec.rationale}</p>}
                     <p className="text-[11px] text-outline">{dec.decided_by || 'Verified'} • {new Date(dec.decision_date || dec.created_at).toLocaleDateString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'conflicts' && (
+          <div className="bg-surface-container-lowest p-space-lg rounded-lg shadow-sm border border-surface-container space-y-space-md">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-container pb-space-sm">
+              <div>
+                <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                  Contradictions & Outdated Knowledge ({conflicts.length})
+                </h2>
+                <p className="text-xs text-outline pt-0.5">
+                  Automated cross-check across extracted claims, ADRs, task deadlines, and ownership.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRunConflictScan}
+                  className="px-3 h-8 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">sync</span>
+                  <span>Scan Now</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('conflicts')}
+                  className="px-3 h-8 rounded bg-primary text-on-primary font-label-md text-label-md cursor-pointer flex items-center gap-1.5 hover:bg-primary-container transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">crisis_alert</span>
+                  <span>Open Conflicts Hub</span>
+                </button>
+              </div>
+            </div>
+
+            {conflicts.length === 0 ? (
+              <div className="text-center py-10 space-y-2">
+                <span className="material-symbols-outlined text-[36px] text-emerald-600">verified</span>
+                <p className="text-sm font-medium text-on-surface">Zero Conflicts Detected</p>
+                <p className="text-xs text-outline max-w-md mx-auto">
+                  Continuity scan verified that all architectural decisions, task deadlines, and document claims are aligned.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-surface-container">
+                {conflicts.map((conflict) => (
+                  <div key={conflict.id} className="py-3.5 space-y-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
+                              conflict.severity === 'high'
+                                ? 'bg-error-container/30 text-error'
+                                : conflict.severity === 'medium'
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-surface-container text-on-surface-variant'
+                            }`}
+                          >
+                            {conflict.severity}
+                          </span>
+                          <span
+                            className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${
+                              conflict.status === 'open'
+                                ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                                : conflict.status === 'resolved'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {conflict.status}
+                          </span>
+                          <h3 className="font-medium text-sm text-on-surface">{conflict.title}</h3>
+                        </div>
+                        <p className="text-xs text-on-surface-variant leading-relaxed">{conflict.description}</p>
+                      </div>
+
+                      {conflict.status === 'open' && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleResolveConflict(conflict.id, 'resolved')}
+                            className="px-2.5 h-7 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-label-sm text-[11px] cursor-pointer"
+                          >
+                            Resolve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveConflict(conflict.id, 'dismissed')}
+                            className="px-2.5 h-7 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-[11px] cursor-pointer"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {conflict.evidence_snippet && (
+                      <div className="p-2.5 rounded bg-surface-container-low border border-surface-container font-code-inline text-[11px] text-on-surface-variant">
+                        <span className="font-semibold text-outline uppercase text-[10px] block mb-1">Source Evidence:</span>
+                        {conflict.evidence_snippet}
+                      </div>
+                    )}
+
+                    {conflict.status === 'resolved' && (
+                      <p className="text-[11px] text-emerald-800">
+                        ✓ Resolved by {conflict.resolved_by || 'Admin'}
+                        {conflict.resolution_notes ? ` (${conflict.resolution_notes})` : ''}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

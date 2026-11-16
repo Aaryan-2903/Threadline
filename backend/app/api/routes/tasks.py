@@ -3,8 +3,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import check_write_permission
 from app.database import get_db
 from app.models.task import TaskPriority, TaskStatus
+from app.models.user import User
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from app.services import task_service
 
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 )
 def create_task(
     task_in: TaskCreate,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> TaskResponse:
     """Create a new task with project validation."""
@@ -87,6 +90,7 @@ def get_task(
 def update_task(
     task_id: UUID,
     task_in: TaskUpdate,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> TaskResponse:
     """Update task fields and record activity event."""
@@ -107,6 +111,7 @@ def update_task(
 def delete_task(
     task_id: UUID,
     actor: Optional[str] = Query(None, max_length=120, description="Actor deleting the task"),
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> Response:
     """Delete a task by ID."""

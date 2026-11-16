@@ -24,6 +24,14 @@ export const HandoverReportsScreen: React.FC = () => {
   const [isSavingSuccessor, setIsSavingSuccessor] = useState<boolean>(false);
   const [successorFeedback, setSuccessorFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Round 3: Lifecycle, Versioning & Sensitive Data Protection
+  const [allReports, setAllReports] = useState<HandoverReport[]>([]);
+  const [redactSensitive, setRedactSensitive] = useState<boolean>(false);
+  const [clarificationModalOpen, setClarificationModalOpen] = useState<boolean>(false);
+  const [clarificationInput, setClarificationInput] = useState<string>('');
+  const [lifecycleLoading, setLifecycleLoading] = useState<boolean>(false);
+  const [lifecycleFeedback, setLifecycleFeedback] = useState<string | null>(null);
+
   const applyReportState = (report: HandoverReport | null) => {
     setCurrentReport(report);
     if (report?.content?.overview) {
@@ -67,9 +75,10 @@ export const HandoverReportsScreen: React.FC = () => {
 
     const loadReports = async () => {
       try {
-        const reports = await api.getHandoverReports(activeProjectId);
+        const reports = await api.getHandoverReports(activeProjectId, redactSensitive);
         if (!isMounted) return;
 
+        setAllReports(reports || []);
         if (reports && reports.length > 0) {
           applyReportState(reports[0]);
         } else {
@@ -77,6 +86,7 @@ export const HandoverReportsScreen: React.FC = () => {
           const actorName = profile.displayName || 'Aryan Mandal';
           const newReport = await api.generateHandoverReport(activeProjectId, actorName);
           if (isMounted) {
+            setAllReports([newReport]);
             applyReportState(newReport);
           }
         }
@@ -90,7 +100,100 @@ export const HandoverReportsScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeProjectId, profile.displayName]);
+  }, [activeProjectId, profile.displayName, redactSensitive]);
+
+  // Handover Lifecycle Action Handlers
+  const handleSendAcknowledgement = async () => {
+    if (!currentReport || !isValidUUID(currentReport.id)) return;
+    setLifecycleLoading(true);
+    setError(null);
+    setLifecycleFeedback(null);
+    try {
+      const updated = await api.sendHandoverAcknowledgement(currentReport.id);
+      applyReportState(updated);
+      setAllReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setLifecycleFeedback(`Handover report sent to ${updated.incoming_owner || 'designated successor'} for formal acknowledgement.`);
+      setTimeout(() => setLifecycleFeedback(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send handover for acknowledgement';
+      setError(msg);
+    } finally {
+      setLifecycleLoading(false);
+    }
+  };
+
+  const handleAcknowledge = async () => {
+    if (!currentReport || !isValidUUID(currentReport.id)) return;
+    setLifecycleLoading(true);
+    setError(null);
+    setLifecycleFeedback(null);
+    try {
+      const actorName = profile.displayName || 'Incoming Owner';
+      const updated = await api.acknowledgeHandover(currentReport.id, 'Formally accepted and ratified by successor.', actorName);
+      applyReportState(updated);
+      setAllReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setLifecycleFeedback('Handover formally acknowledged and ratified in audit ledger.');
+      setTimeout(() => setLifecycleFeedback(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to acknowledge handover';
+      setError(msg);
+    } finally {
+      setLifecycleLoading(false);
+    }
+  };
+
+  const handleRequestClarificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentReport || !isValidUUID(currentReport.id) || !clarificationInput.trim()) return;
+    setLifecycleLoading(true);
+    setError(null);
+    try {
+      const actorName = profile.displayName || 'Incoming Owner';
+      const updated = await api.requestHandoverClarification(currentReport.id, clarificationInput.trim(), actorName);
+      applyReportState(updated);
+      setAllReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setClarificationModalOpen(false);
+      setClarificationInput('');
+      setLifecycleFeedback('Clarification request recorded and dispatched to outgoing lead.');
+      setTimeout(() => setLifecycleFeedback(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to request clarification';
+      setError(msg);
+    } finally {
+      setLifecycleLoading(false);
+    }
+  };
+
+  const handleCreateVersion = async () => {
+    if (!currentReport || !isValidUUID(currentReport.id)) return;
+    setLifecycleLoading(true);
+    setError(null);
+    try {
+      const actorName = profile.displayName || 'System';
+      const newVersion = await api.createHandoverVersion(currentReport.id, `Revision by ${actorName}`);
+      applyReportState(newVersion);
+      setAllReports((prev) => [newVersion, ...prev]);
+      setLifecycleFeedback(`Created new handover revision version (v${newVersion.version}).`);
+      setTimeout(() => setLifecycleFeedback(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create new revision version';
+      setError(msg);
+    } finally {
+      setLifecycleLoading(false);
+    }
+  };
+
+  // Export PDF trigger
+  const handleExportPdf = () => {
+    if (!currentReport) return;
+    const downloadUrl = api.getHandoverReportPdfUrl(currentReport.id, redactSensitive);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `${currentReport.title.replace(/\s+/g, '_')}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Generate or regenerate report
   const handleGenerateReport = async () => {
@@ -143,18 +246,6 @@ export const HandoverReportsScreen: React.FC = () => {
     } finally {
       setIsSavingSuccessor(false);
     }
-  };
-
-  // Export PDF trigger
-  const handleExportPdf = () => {
-    if (!currentReport) return;
-    const downloadUrl = api.getHandoverReportPdfUrl(currentReport.id);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = `${currentReport.title.replace(/\s+/g, '_')}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const content = currentReport?.content;
@@ -291,6 +382,157 @@ export const HandoverReportsScreen: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Round 3: Handover Lifecycle, Versioning & Sensitive Data Protection Banner */}
+      {currentReport && (
+        <section className="w-full bg-linear-to-r from-surface-container-low to-surface-container-lowest px-space-xl py-3 border-b border-outline-variant/20 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+          {/* Left: Version & Owners & Acknowledgement Status */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Version dropdown if multiple versions exist */}
+            {allReports.length > 1 ? (
+              <div className="flex items-center gap-1.5 bg-surface-container-highest/80 px-2.5 py-1 rounded-lg border border-outline-variant/30">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Revision:</span>
+                <select
+                  value={currentReport.id}
+                  onChange={(e) => {
+                    const sel = allReports.find((r) => r.id === e.target.value);
+                    if (sel) applyReportState(sel);
+                  }}
+                  className="bg-transparent text-xs font-bold text-on-surface cursor-pointer focus:outline-hidden"
+                >
+                  {allReports.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      v{r.version || 1} — {new Date(r.created_at).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <span className="px-2.5 py-1 rounded-lg bg-surface-container-highest text-on-surface text-xs font-bold border border-outline-variant/30">
+                Version {currentReport.version || 1}
+              </span>
+            )}
+
+            {/* Outgoing & Incoming Owners */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
+                Outgoing: <strong className="text-gray-900">{currentReport.outgoing_owner || 'Marcus Vance'}</strong>
+              </span>
+              <span className="text-gray-400">➔</span>
+              <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">
+                Incoming: <strong className="text-indigo-900">{currentReport.incoming_owner || 'Unassigned'}</strong>
+              </span>
+            </div>
+
+            {/* Acknowledgement Status Pill */}
+            <div className="flex items-center gap-1.5">
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                currentReport.acknowledgement_status === 'acknowledged'
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : currentReport.acknowledgement_status === 'pending'
+                  ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
+                  : currentReport.acknowledgement_status === 'clarification_requested'
+                  ? 'bg-rose-100 text-rose-800 border-rose-300'
+                  : 'bg-gray-100 text-gray-800 border-gray-300'
+              }`}>
+                {currentReport.acknowledgement_status === 'clarification_requested'
+                  ? 'Clarification Requested'
+                  : currentReport.acknowledgement_status === 'pending'
+                  ? 'Pending Acknowledgement'
+                  : currentReport.acknowledgement_status === 'acknowledged'
+                  ? 'Handover Acknowledged & Signed Off'
+                  : 'Draft (Not Yet Sent)'}
+              </span>
+              {currentReport.acknowledged_at && (
+                <span className="text-[11px] text-gray-500 font-medium">
+                  Ratified on {new Date(currentReport.acknowledged_at).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Redaction Shield Toggle & Lifecycle Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sensitive Data Redaction Shield Toggle */}
+            <button
+              onClick={() => setRedactSensitive(!redactSensitive)}
+              className={`h-8 px-3 rounded text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer border ${
+                redactSensitive
+                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-400/30'
+                  : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high border-outline-variant/30'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {redactSensitive ? 'shield' : 'security'}
+              </span>
+              <span>{redactSensitive ? 'Shield Active: Redacted' : 'Mask Sensitive Data'}</span>
+            </button>
+
+            {/* Lifecycle Action Buttons */}
+            {currentReport.acknowledgement_status === 'draft' && (
+              <button
+                onClick={handleSendAcknowledgement}
+                disabled={lifecycleLoading}
+                className="h-8 px-3.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">send</span>
+                <span>Send for Acknowledgement</span>
+              </button>
+            )}
+
+            {currentReport.acknowledgement_status === 'pending' && (
+              <>
+                <button
+                  onClick={handleAcknowledge}
+                  disabled={lifecycleLoading}
+                  className="h-8 px-3.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">verified</span>
+                  <span>Acknowledge & Sign Off</span>
+                </button>
+                <button
+                  onClick={() => setClarificationModalOpen(true)}
+                  disabled={lifecycleLoading}
+                  className="h-8 px-3 rounded border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">help</span>
+                  <span>Request Clarification</span>
+                </button>
+              </>
+            )}
+
+            {(currentReport.acknowledgement_status === 'clarification_requested' || currentReport.acknowledgement_status === 'acknowledged') && (
+              <button
+                onClick={handleCreateVersion}
+                disabled={lifecycleLoading}
+                className="h-8 px-3.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-container-high text-xs font-semibold border border-outline-variant/30 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                <span>Create Revision (v{(currentReport.version || 1) + 1})</span>
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Clarification Notes Callout if present */}
+      {currentReport?.acknowledgement_status === 'clarification_requested' && currentReport.clarification_notes && (
+        <section className="w-full bg-rose-50 border-b border-rose-200 px-space-xl py-3 flex items-start gap-2.5 text-xs text-rose-900">
+          <span className="material-symbols-outlined text-rose-600 text-[18px] shrink-0 mt-0.5">report_problem</span>
+          <div className="space-y-0.5">
+            <span className="font-bold">Clarification Notes from Successor:</span>
+            <p className="text-rose-800 leading-relaxed">{currentReport.clarification_notes}</p>
+          </div>
+        </section>
+      )}
+
+      {/* Notification banner for lifecycle feedback */}
+      {lifecycleFeedback && (
+        <div className="w-full bg-indigo-50 border-b border-indigo-200 px-space-xl py-2 flex items-center gap-2 text-xs text-indigo-900 font-medium">
+          <span className="material-symbols-outlined text-indigo-600 text-[16px]">info</span>
+          <span>{lifecycleFeedback}</span>
+        </div>
+      )}
 
       {/* Metric Ribbons */}
       {content && (
@@ -705,6 +947,57 @@ export const HandoverReportsScreen: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Clarification Request Modal */}
+      {clarificationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+              <h3 className="text-base font-bold text-gray-900">Request Clarification</h3>
+              <button
+                onClick={() => setClarificationModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold p-1 cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Specify what questions or architectural blockers need resolution before you can formally sign off on this handover dossier.
+            </p>
+            <form onSubmit={handleRequestClarificationSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Clarification Required <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={clarificationInput}
+                  onChange={(e) => setClarificationInput(e.target.value)}
+                  placeholder="e.g. Please clarify runbook procedures for automated failover before handover sign-off."
+                  className="w-full text-xs p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setClarificationModalOpen(false)}
+                  className="px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={lifecycleLoading || !clarificationInput.trim()}
+                  className="px-5 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
+                >
+                  {lifecycleLoading ? 'Submitting...' : 'Send Clarification Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

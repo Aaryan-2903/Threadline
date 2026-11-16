@@ -36,7 +36,7 @@ Threadline is an AI-powered project knowledge continuity and handover platform t
 13. [Deployment Architecture](#deployment-architecture)
 14. [Security Considerations & Limitations](#security-considerations--limitations)
 15. [Team ALT-F4](#team-alt-f4)
-16. [Roadmap — Planned Round 3 Capabilities](#roadmap--planned-round-3-capabilities)
+16. [Round 3 Implemented Capabilities](#round-3-implemented-capabilities)
 17. [License & Acknowledgements](#license--acknowledgements)
 
 ---
@@ -623,11 +623,16 @@ All endpoints are mounted under `/api/v1`. Note that collection routes enforce t
 
 | Group | Method | Endpoint Path | Description |
 | :--- | :--- | :--- | :--- |
+| **Authentication & RBAC** | `POST` | `/api/v1/auth/demo-login` | One-click judge demo login (returns token & demo judge user). |
+| | `POST` | `/api/v1/auth/login` | Secure OAuth2 password flow login (returns JWT token). |
+| | `GET` | `/api/v1/auth/me` | Retrieve profile and role of authenticated user. |
+| | `GET` | `/api/v1/auth/users` | List system users and active roles. |
+| | `PATCH` | `/api/v1/auth/users/{id}/role` | Admin endpoint to promote or alter user role. |
 | **Projects** | `POST` | `/api/v1/projects/` | Create a new project. |
 | | `GET` | `/api/v1/projects/` | List all projects (ordered newest first). |
 | | `GET` | `/api/v1/projects/{id}` | Retrieve a project by UUID. |
 | | `PATCH` | `/api/v1/projects/{id}` | Update project metadata or status. |
-| | `DELETE` | `/api/v1/projects/{id}` | Delete project with cascading delete of children. |
+| | `DELETE` | `/api/v1/projects/{id}` | Delete project with cascading delete of children (Admin/Owner only). |
 | | `GET` | `/api/v1/projects/{id}/timeline` | Retrieve chronological activity timeline for project. |
 | **Tasks** | `POST` | `/api/v1/tasks/` | Create a standalone task. |
 | | `GET` | `/api/v1/tasks/` | List tasks with optional project, status, priority filters. |
@@ -639,10 +644,17 @@ All endpoints are mounted under `/api/v1`. Note that collection routes enforce t
 | | `GET` | `/api/v1/decisions/{id}` | Retrieve decision record. |
 | | `PATCH` | `/api/v1/decisions/{id}` | Update decision rationale or decider. |
 | | `DELETE` | `/api/v1/decisions/{id}` | Delete decision. |
+| **Conflicts** | `GET` | `/api/v1/projects/{id}/conflicts/` | List detected project conflicts with status filters. |
+| | `POST` | `/api/v1/projects/{id}/conflicts/detect` | Run idempotent cross-claim and entity contradiction detection engine. |
+| | `GET` | `/api/v1/conflicts/{id}` | Retrieve conflict details and source citations. |
+| | `PATCH` | `/api/v1/conflicts/{id}` | Resolve or dismiss conflict with resolution rationale and audit logging. |
 | **Activities** | `GET` | `/api/v1/activities/` | Retrieve system-wide activity timeline. |
+| **Audit Logs** | `GET` | `/api/v1/audit-logs/` | Query immutable audit logs (filter by action or project). |
+| | `GET` | `/api/v1/projects/{id}/audit-logs/` | Query audit trail scoped to a specific project. |
 | **Documents** | `POST` | `/api/v1/documents/upload` | Upload PDF or DOCX file with signature validation. |
-| | `GET` | `/api/v1/documents/` | List documents (metadata only; content deferred). |
-| | `GET` | `/api/v1/documents/{id}` | Retrieve document details. |
+| | `GET` | `/api/v1/documents/` | List documents (supports `?redact=true` masking flag). |
+| | `GET` | `/api/v1/documents/{id}` | Retrieve document details (supports `?redact=true`). |
+| | `GET` | `/api/v1/documents/{id}/sensitive-scan` | Inspect detected sensitive tokens (PII, API keys) in document. |
 | | `POST` | `/api/v1/documents/{id}/process` | Trigger re-extraction on an uploaded document. |
 | | `DELETE` | `/api/v1/documents/{id}` | Delete document and associated extracted claims. |
 | **Reviews** | `GET` | `/api/v1/reviews/` | List candidate extracted claims for review. |
@@ -655,10 +667,14 @@ All endpoints are mounted under `/api/v1`. Note that collection routes enforce t
 | | `GET` | `/api/v1/continuity/summary` | Summary counts of nodes, orphans, and blockers. |
 | | `GET` | `/api/v1/continuity/nodes/{id}` | Inspect predecessors and successors for a specific node. |
 | **Reports** | `POST` | `/api/v1/reports/generate` | Synthesize an 11-section handover report. |
-| | `GET` | `/api/v1/reports/` | List handover reports. |
-| | `GET` | `/api/v1/reports/{id}` | Retrieve full handover report JSON content. |
+| | `GET` | `/api/v1/reports/` | List handover reports (supports `?redact=true` masking flag). |
+| | `GET` | `/api/v1/reports/{id}` | Retrieve full handover report JSON content (supports `?redact=true`). |
 | | `PATCH` | `/api/v1/reports/{id}/successor` | Assign or update incoming owner and role. |
-| | `GET` | `/api/v1/reports/{id}/pdf` | Export handover report formatted for print/PDF. |
+| | `POST` | `/api/v1/reports/{id}/send-acknowledgement` | Transition handover to `pending` acknowledgement. |
+| | `POST` | `/api/v1/reports/{id}/acknowledge` | Incoming owner sign-off and formal acceptance. |
+| | `POST` | `/api/v1/reports/{id}/request-clarification` | Request clarification with structured notes. |
+| | `POST` | `/api/v1/reports/{id}/versions` | Create immutable version snapshot (v1, v2...). |
+| | `GET` | `/api/v1/reports/{id}/pdf` | Export handover report formatted for print/PDF (supports `?redact=true`). |
 
 ---
 
@@ -670,10 +686,10 @@ Threadline maintains automated test suites across both the backend and frontend.
 
 | Test Suite | Tests Run | Result | Execution Time |
 | :--- | :--- | :--- | :--- |
-| **Backend Suite (`pytest`)** | 133 tests | **133 Passed**, 0 Failed, 30 warnings | ~9.5 seconds |
-| **Frontend Suite (`node --test`)** | 16 tests | **16 Passed**, 0 Failed | ~0.2 seconds |
-| **Frontend Linter (`oxlint`)** | 33 source files | **0 Errors, 0 Warnings** | ~0.15 seconds |
-| **Production Build (`tsc -b && vite build`)** | Full frontend bundle | **Build Succeeded** | ~0.3 seconds |
+| **Backend Suite (`pytest`)** | 142 tests | **142 Passed**, 0 Failed, 30 warnings | ~115 seconds |
+| **Frontend Suite (`node --test`)** | 19 tests | **19 Passed**, 0 Failed | ~0.17 seconds |
+| **Frontend Linter (`oxlint`)** | 38 source files | **0 Errors**, 2 warnings | ~0.19 seconds |
+| **Production Build (`tsc -b && vite build`)** | Full frontend bundle | **Build Succeeded** | ~0.35 seconds |
 
 ### Backend Test Coverage Areas
 1. **Activity Timeline (`test_activities.py`):** Entity creation triggers, status changes, idempotent no-op handling, timeline ordering, cascade deletions.
@@ -685,6 +701,10 @@ Threadline maintains automated test suites across both the backend and frontend.
 7. **CORS Security (`test_cors.py`):** Origin whitelist validation, prohibition of wildcards in production, credential pairing rules, preflight options.
 8. **Alembic Migrations (`test_migrations.py`):** Fresh database creation, downgrade to base, re-upgrade to head, SQLite foreign key enforcement, CLI execution from backend working directory.
 9. **Continuity & Handover Reports (`test_continuity_and_reports.py`):** Relational continuity map building, orphan detection, blocking path calculation, 11-section handover report synthesis, successor assignment, PDF export styling.
+10. **Authentication & RBAC (`test_auth_and_rbac.py`):** JWT token generation/decoding, bcrypt password hashing, 4-tier role permission enforcement (`admin`, `project_owner`, `contributor`, `viewer`), viewer mutation blocking, contributor restriction on conflict resolution and project deletion.
+11. **Conflict Detection Engine (`test_conflicts.py`):** Idempotent detection of contradictory claims, superseded architectural decisions, conflicting task deadlines/assignees, resolution status tracking (`open`, `resolved`, `dismissed`).
+12. **Sensitive Data Redaction Shield (`test_redaction_and_sensitive_data.py`):** Automated masking of API keys (`sk-...`, `AIza...`, `ghp_...`, Bearer tokens), emails, phone numbers, recursive JSON structure redaction.
+13. **Handover Lifecycle & Acknowledgement (`test_handover_lifecycle.py`):** State transitions (`draft` -> `pending` -> `acknowledged` / `clarification_requested`), clarification notes, version history snapshots.
 
 ---
 
@@ -730,7 +750,9 @@ flowchart LR
 
 ## Security Considerations & Limitations
 
-- **Demo Authentication Scope:** For the purposes of the hackathon evaluation, user authentication and login are intentionally omitted. The demo instance is publicly accessible. **Do not upload proprietary, confidential, or sensitive documents.**
+- **Authentication & RBAC (Round 3 Implemented):** Backend endpoints enforce role-based access control with signed JWT tokens (`HS256`) and direct `bcrypt` password hashing. Four permission tiers are active: `Admin`, `Project Owner`, `Contributor`, and `Viewer`. Viewers have read-only access, while Contributors are restricted from destructive actions and conflict resolutions.
+- **Sensitive Data Redaction Shield (Round 3 Implemented):** Automated regex pattern matching detects API tokens (`sk-...`, `AIza...`, `ghp_...`, Bearer tokens), emails, and phone numbers. The `redact=true` flag dynamically masks sensitive values in document and report endpoints before rendering or PDF export.
+- **Audit Logging (Round 3 Implemented):** Immutable audit log entries (`AuditLog`) record security-relevant operations, permission modifications, deletions, and conflict resolutions.
 - **Human Verification Required:** AI-assisted knowledge extraction is non-deterministic. Threadline explicitly models machine extraction as candidate claims that require human approval before being promoted to verified project records.
 - **Inferred vs. Verified Data:** Machine-generated health scores and recommendations are presented as analytic signals, not certified facts.
 - **Rate Limiting & Abuse Prevention:** In-memory sliding-window rate limiting is active on the backend to prevent denial-of-service and automated flooding of expensive AI endpoints.
@@ -740,34 +762,54 @@ flowchart LR
 
 ## Team ALT-F4
 
-Developed for the **CodersInPune Hackathon Round 2**:
+Developed for the **CodersInPune Hackathon Round 2 & Round 3**:
 
 - **Aryan Mandal** — Team Lead & Full-Stack / Frontend Developer
-- **Atharva Patil** — *(Role to be confirmed)*
-- **Parikshit Arbad** — *(Role to be confirmed)*
-- **Janhavi Gaud** — *(Role to be confirmed)*
+- **Atharva Patil** — Full-Stack Developer
+- **Parikshit Arbad** — Backend & Systems Architect
+- **Janhavi Gaud** — UI/UX & QA Engineer
 
 ---
 
-## Roadmap — Planned Round 3 Capabilities
+## Round 3 Implemented Capabilities
 
-The following capabilities are prioritized for the next phase of development:
+All three improvements promised in the Round 2 submission have been fully designed, implemented end-to-end, and verified in both backend and frontend:
 
 ### 1. Advanced Conflict Detection and Resolution
-- Cross-document contradiction detection analyzing semantic disagreement across multiple technical specifications.
-- Superseded decision tracking identifying when a newer ADR invalidates an earlier architecture choice.
-- Side-by-side evidence inspection showing opposing text snippets and allowing authorized leads to record formal resolution rationales with full audit history.
+- **Multi-Vector Contradiction Engine:** Automatically scans project claims, architectural decisions, task assignees, and deadlines to identify conflicts.
+- **Superseded Decision Tracking:** Detects when newer ADRs replace or contradict earlier design choices and flags them as `superseded_decision`.
+- **Task Owner & Deadline Discrepancies:** Identifies conflicting deadlines between interdependent deliverables and conflicting ownership assignments across documentation.
+- **Side-by-Side Evidence Inspection:** Renders side-by-side opposing evidence snippets with verbatim text and document citations.
+- **Idempotent Scanning:** Re-running conflict detection updates open issues without overwriting existing resolutions or duplicate records.
+- **Resolution Lifecycle:** Tracks resolution statuses (`open`, `resolved`, `dismissed`) with resolution actor, timestamp, and audit notes.
 
 ### 2. Role-Based Access Control & Sensitive Data Protection
-- Granular permission tiers: Administrator, Project Owner, Technical Contributor, and Read-Only Stakeholder.
-- Project-level access isolation restricting visibility of confidential projects.
-- Automated sensitive data detection (API tokens, private keys, PII) with automated masking during text extraction.
-- Cryptographically verifiable tamper-evident audit logs for all approval and deletion events.
+- **JWT Authentication & Direct bcrypt Hashing:** Signed Bearer tokens with 4 distinct permission tiers:
+  - **Admin:** Full access across all workspaces, user role administration, and system audit logs.
+  - **Project Owner:** Complete control over assigned projects, conflict resolution, document uploads, and handover generation.
+  - **Contributor:** Read and edit tasks and decisions; cannot resolve conflicts or delete projects.
+  - **Viewer:** Strict read-only access across all endpoints; mutations return HTTP 403 Forbidden.
+- **Sensitive Data Redaction Shield:** Real-time regex detection and masking of API keys (`sk-...`, `AIza...`, `ghp_...`, Bearer tokens), personal email addresses, and phone numbers.
+- **Interactive Redaction Toggle:** Handover reports and document views feature a one-click Redaction Shield toggle with real-time preview and export masking.
+- **Immutable Audit Trail:** Append-only log recording actor, timestamp, IP address, resource ID, action type, and details.
 
 ### 3. Handover Lifecycle & Acknowledgement Tracking
-- Versioned handover report snapshots tied to specific release milestones.
-- Bidirectional handover workflow: outgoing owners generate handovers, incoming owners submit clarification questions on specific report sections.
-- Formal sign-off and acknowledgement workflow recording mutual acceptance of project ownership with completion checklists.
+- **Explicit Successor Assignment:** Outgoing owner and incoming owner assignment with dedicated role attribution.
+- **Lifecycle State Machine:**
+  - `draft`: Initial working handover report.
+  - `pending`: Outgoing owner sends handover for formal review.
+  - `acknowledged`: Incoming owner completes verification and officially signs off on ownership transfer.
+  - `clarification_requested`: Incoming owner requests clarifications with structured feedback notes.
+- **Version History & Snapshotting:** Explicit version incrementation (`v1`, `v2`, `v3...`) preserving historical handover state across milestones.
+- **Incomplete Tasks & Handover Impact:** Visual tracking of pending/blocked tasks and their handover risk score.
+
+### 4. Judge One-Click Demo Access
+- **Instant Demo Evaluation:** A dedicated "Judge Demo Access" action in the top navigation bar logs in as `demojudge` with one click via `/api/v1/auth/demo-login`.
+- **Pre-Populated Demo Workspace:** Automatically provisions the "Acme Cloud Platform Migration" project featuring realistic architectural decisions, cross-document conflicts, active tasks, ingested documents, and an audit trail ready for inspection.
+- **Demo Credentials:**
+  - **Username:** `demojudge` (or `admin`)
+  - **Password:** `demo123` (or `admin123`)
+  - Role switcher allows rapid switching between `Admin`, `Project Owner`, `Contributor`, and `Viewer` to evaluate permissions in real-time.
 
 ---
 

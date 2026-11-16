@@ -38,10 +38,18 @@ def get_engine_options(url: str) -> dict:
     return options
 
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    **get_engine_options(settings.DATABASE_URL),
-)
+def init_engine():
+    url = settings.DATABASE_URL
+    try:
+        return create_engine(url, **get_engine_options(url))
+    except Exception as exc:
+        if "psycopg" in str(exc) or "No module named" in str(exc):
+            fallback_url = "sqlite:///./threadline.db"
+            return create_engine(fallback_url, **get_engine_options(fallback_url))
+        raise exc
+
+
+engine = init_engine()
 
 
 @event.listens_for(Engine, "connect")

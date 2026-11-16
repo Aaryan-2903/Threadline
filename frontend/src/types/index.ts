@@ -82,6 +82,8 @@ export interface DocumentItem {
   error_message?: string;
   extracted_claims_count: number;
   page_count: number;
+  extracted_text?: string;
+  sensitive_findings_count?: number;
   created_at: string;
   updated_at: string;
   project_name?: string;
@@ -270,9 +272,72 @@ export interface HandoverReport {
   summary?: string;
   status: string;
   generated_by?: string;
+  version: number;
+  outgoing_owner?: string;
+  incoming_owner?: string;
+  incoming_owner_role?: string;
+  acknowledgement_status: 'draft' | 'pending' | 'acknowledged' | 'clarification_requested';
+  clarification_notes?: string;
+  sent_at?: string;
+  acknowledged_at?: string;
   content: HandoverReportContent;
   created_at: string;
   updated_at: string;
+}
+
+export type UserRole = 'admin' | 'project_owner' | 'contributor' | 'viewer';
+
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  role: UserRole;
+  is_active: boolean;
+  is_demo: boolean;
+  created_at: string;
+}
+
+export type ConflictType =
+  | 'superseded_decision'
+  | 'conflicting_deadline'
+  | 'conflicting_assignee'
+  | 'contradictory_claim';
+
+export type ConflictSeverity = 'low' | 'medium' | 'high';
+export type ConflictStatus = 'open' | 'resolved' | 'dismissed';
+
+export interface ConflictItem {
+  id: string;
+  project_id: string;
+  conflict_type: ConflictType | string;
+  severity: ConflictSeverity | string;
+  title: string;
+  description: string;
+  source_entity_type?: string;
+  source_entity_id?: string;
+  target_entity_type?: string;
+  target_entity_id?: string;
+  evidence_snippet?: string;
+  status: ConflictStatus | string;
+  resolved_by?: string;
+  resolution_notes?: string;
+  resolved_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  user_id?: string;
+  username: string;
+  user_role?: string;
+  project_id?: string;
+  action: string;
+  resource_type?: string;
+  resource_id?: string;
+  details?: string;
+  ip_address?: string;
+  timestamp: string;
 }
 
 export type ScreenId =
@@ -281,6 +346,7 @@ export type ScreenId =
   | 'project-workspace'
   | 'my-tasks'
   | 'decisions'
+  | 'conflicts'
   | 'activity'
   | 'documents'
   | 'handover-reports'

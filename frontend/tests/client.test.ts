@@ -96,6 +96,18 @@ describe('Frontend API Client URL Construction', () => {
       await api.getHandoverReports(VALID_UUID);
       assert.strictEqual(capturedUrls[1].url, `${API_BASE}/reports/?project_id=${VALID_UUID}`);
     });
+
+    it('getConflicts requests /api/v1/projects/{id}/conflicts/ with trailing slash', async () => {
+      await api.getConflicts(VALID_UUID);
+      assert.strictEqual(capturedUrls[0].url, `${API_BASE}/projects/${VALID_UUID}/conflicts/`);
+      assert.strictEqual(capturedUrls[0].method, 'GET');
+    });
+
+    it('getAuditLogs requests /api/v1/audit-logs/ with trailing slash', async () => {
+      await api.getAuditLogs();
+      assert.strictEqual(capturedUrls[0].url, `${API_BASE}/audit-logs/`);
+      assert.strictEqual(capturedUrls[0].method, 'GET');
+    });
   });
 
   describe('Resource & Action Endpoints (Must NOT have trailing slashes)', () => {
@@ -187,6 +199,32 @@ describe('Frontend API Client URL Construction', () => {
 
       await api.getContinuityNodeDetail(VALID_UUID, 'node-123');
       assert.strictEqual(capturedUrls[4].url, `${API_BASE}/continuity/nodes/node-123?project_id=${VALID_UUID}`);
+    });
+
+    it('conflict and handover action endpoints do not have trailing slashes', async () => {
+      await api.detectConflicts(VALID_UUID);
+      assert.strictEqual(capturedUrls[0].url, `${API_BASE}/projects/${VALID_UUID}/conflicts/detect`);
+      assert.strictEqual(capturedUrls[0].method, 'POST');
+
+      await api.resolveConflict(VALID_UUID, { status: 'resolved', resolution_notes: 'Done' });
+      assert.strictEqual(capturedUrls[1].url, `${API_BASE}/conflicts/${VALID_UUID}`);
+      assert.strictEqual(capturedUrls[1].method, 'PATCH');
+
+      await api.sendHandoverAcknowledgement(VALID_UUID);
+      assert.strictEqual(capturedUrls[2].url, `${API_BASE}/reports/${VALID_UUID}/send-acknowledgement`);
+      assert.strictEqual(capturedUrls[2].method, 'POST');
+
+      await api.acknowledgeHandover(VALID_UUID);
+      assert.strictEqual(capturedUrls[3].url, `${API_BASE}/reports/${VALID_UUID}/acknowledge`);
+      assert.strictEqual(capturedUrls[3].method, 'POST');
+
+      await api.requestHandoverClarification(VALID_UUID, 'Need info');
+      assert.strictEqual(capturedUrls[4].url, `${API_BASE}/reports/${VALID_UUID}/request-clarification`);
+      assert.strictEqual(capturedUrls[4].method, 'POST');
+
+      await api.createHandoverVersion(VALID_UUID);
+      assert.strictEqual(capturedUrls[5].url, `${API_BASE}/reports/${VALID_UUID}/versions`);
+      assert.strictEqual(capturedUrls[5].method, 'POST');
     });
   });
 });

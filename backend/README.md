@@ -83,48 +83,67 @@ backend/
 │   ├── main.py                   # ASGI application, CORS, rate limiter, routers, lifespan
 │   ├── database.py               # SQLAlchemy engine, session maker, get_db, init_db
 │   ├── api/
+│   │   ├── deps.py               # Auth & RBAC dependencies (get_current_user, require_role)
 │   │   └── routes/               # API route handlers
+│   │       ├── auth.py           # OAuth2 password & demo login, user roles
 │   │       ├── projects.py       # Project routes and nested tasks/decisions/timeline
 │   │       ├── tasks.py          # Standalone task CRUD & filtering
 │   │       ├── decisions.py      # Standalone decision (ADR) CRUD
+│   │       ├── conflicts.py      # Contradiction detection engine & resolution
 │   │       ├── activities.py     # Global activity timeline
-│   │       ├── documents.py      # Document upload, extraction, reprocessing
+│   │       ├── audit_logs.py     # Immutable system & project audit trails
+│   │       ├── documents.py      # Document upload, extraction, sensitive scan, redaction
 │   │       ├── reviews.py        # AI Review Queue approval/rejection endpoints
 │   │       ├── continuity.py     # Relational knowledge continuity graph endpoints
-│   │       └── reports.py        # Handover report generation, updates & PDF export
+│   │       └── reports.py        # Handover report generation, lifecycle & PDF export
 │   ├── core/
-│   │   ├── config.py             # Pydantic Settings & environment variable parsing
+│   │   ├── config.py             # Pydantic Settings, JWT keys & origin parser
+│   │   ├── security.py           # Direct bcrypt hashing & PyJWT token utilities
 │   │   └── rate_limiter.py       # Sliding-window rate limiting middleware
 │   ├── models/                   # SQLAlchemy declarative ORM models
+│   │   ├── user.py               # User entity with hashed passwords & role enum
 │   │   ├── project.py            # Project entity with cascading relationships
 │   │   ├── task.py               # Task entity with status & priority enums
 │   │   ├── decision.py           # Decision entity with rationale & decided_by
+│   │   ├── conflict.py           # Conflict entity with evidence citations & status
 │   │   ├── activity.py           # Append-only activity log
+│   │   ├── audit_log.py          # Immutable audit log for security & actions
 │   │   ├── document.py           # Document metadata with deferred binary content
 │   │   ├── extracted_knowledge.py# Categorized candidate knowledge claims
-│   │   └── report.py             # Handover report with JSON section structure
+│   │   └── report.py             # Handover report with lifecycle & versioning
 │   ├── schemas/                  # Pydantic validation models with length limits
+│   │   ├── user.py
 │   │   ├── project.py
 │   │   ├── task.py
 │   │   ├── decision.py
+│   │   ├── conflict.py
 │   │   ├── activity.py
+│   │   ├── audit_log.py
 │   │   ├── document.py
 │   │   ├── extracted_knowledge.py
 │   │   ├── continuity.py
 │   │   └── report.py
 │   └── services/                 # Domain logic and external integrations
+│       ├── user_service.py       # User auth & demo workspace provisioner
 │       ├── project_service.py
 │       ├── task_service.py
 │       ├── decision_service.py
+│       ├── conflict_service.py   # Multi-vector contradiction detection engine
+│       ├── redaction_service.py  # Regex sensitive data scanner & masking
+│       ├── audit_service.py      # Append-only audit logger
 │       ├── activity_service.py
 │       ├── document_service.py
 │       ├── extraction_service.py # PyMuPDF & python-docx archive safety parser
 │       ├── ai_service.py         # Gemini, OpenAI & deterministic fallback
 │       ├── review_service.py     # Idempotent approvals & atomic promotion
 │       ├── continuity_service.py # NetworkX graph builder & path analysis
-│       └── report_service.py     # 11-section handover report synthesis
-└── tests/                        # Pytest automated test suite (133 tests)
+│       └── report_service.py     # 11-section handover report & lifecycle
+└── tests/                        # Pytest automated test suite (142 tests)
     ├── conftest.py               # In-memory SQLite fixtures & mock engines
+    ├── test_auth_and_rbac.py
+    ├── test_conflicts.py
+    ├── test_redaction_and_sensitive_data.py
+    ├── test_handover_lifecycle.py
     ├── test_projects.py
     ├── test_tasks.py
     ├── test_decisions.py

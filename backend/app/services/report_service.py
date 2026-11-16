@@ -358,6 +358,11 @@ class HandoverReportService:
             status="generated",
             content_json=content.model_dump_json(),
             generated_by=actor or "System",
+            version=1,
+            outgoing_owner=outgoing_owner,
+            incoming_owner=incoming_owner_str if incoming_owner_str != "Not assigned" else None,
+            incoming_owner_role=incoming_owner_role,
+            acknowledgement_status="draft",
         )
         db.add(report)
 
@@ -450,9 +455,112 @@ class HandoverReportService:
             )
 
         report.content_json = content.model_dump_json()
+        report.incoming_owner = incoming_owner_str if incoming_owner_str != "Not assigned" else None
+        report.incoming_owner_role = incoming_owner_role_str
         db.commit()
         db.refresh(report)
         return report
+
+    @classmethod
+    def send_for_acknowledgement(
+        cls,
+        db: Session,
+        report_id: UUID,
+        actor: Optional[str] = "Outgoing Owner",
+        notes: Optional[str] = None,
+    ) -> HandoverReport:
+        report = cls.get_report(db, report_id)
+        report.acknowledgement_status = "pending"
+        report.sent_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(report)
+
+        record_activity(
+            db=db,
+            project_id=report.project_id,
+            event_type="handover_sent",
+            description=f"Handover report sent for acknowledgement by {actor or 'Outgoing Owner'}. Successor: {report.incoming_owner or 'Unassigned'}",
+            actor=actor or "Outgoing Owner",
+            entity_type="report",
+            entity_id=report.id,
+        )
+        return report
+
+    @classmethod
+    def acknowledge_handover(
+        cls,
+        db: Session,
+        report_id: UUID,
+        actor: Optional[str] = "Incoming Owner",
+        notes: Optional[str] = None,
+    ) -> HandoverReport:
+        report = cls.get_report(db, report_id)
+        report.acknowledgement_status = "acknowledged"
+        report.acknowledged_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(report)
+
+        record_activity(
+            db=db,
+            project_id=report.project_id,
+            event_type="handover_acknowledged",
+            description=f"Handover formally acknowledged and ratified by {actor or 'Incoming Owner'}. Notes: {notes or 'None'}",
+            actor=actor or "Incoming Owner",
+            entity_type="report",
+            entity_id=report.id,
+        )
+        return report
+
+    @classmethod
+    def request_clarification(
+        cls,
+        db: Session,
+        report_id: UUID,
+        notes: str,
+        actor: Optional[str] = "Incoming Owner",
+    ) -> HandoverReport:
+        report = cls.get_report(db, report_id)
+        report.acknowledgement_status = "clarification_requested"
+        report.clarification_notes = notes
+        db.commit()
+        db.refresh(report)
+
+        record_activity(
+            db=db,
+            project_id=report.project_id,
+            event_type="handover_clarification_requested",
+            description=f"Clarification requested on handover by {actor or 'Incoming Owner'}: {notes[:100]}",
+            actor=actor or "Incoming Owner",
+            entity_type="report",
+            entity_id=report.id,
+        )
+        return report
+
+    @classmethod
+    def create_version(
+        cls,
+        db: Session,
+        report_id: UUID,
+        title: Optional[str] = None,
+        actor: Optional[str] = "System",
+    ) -> HandoverReport:
+        current_report = cls.get_report(db, report_id)
+        # Generate fresh report for project
+        new_report = cls.generate_report(
+            db=db,
+            project_id=current_report.project_id,
+            actor=actor,
+            incoming_owner=current_report.incoming_owner,
+            incoming_owner_role=current_report.incoming_owner_role,
+        )
+        new_report.version = current_report.version + 1
+        if title:
+            new_report.title = title
+        else:
+            new_report.title = f"{current_report.title} (v{new_report.version})"
+        db.commit()
+        db.refresh(new_report)
+        return new_report
 
     @classmethod
     def export_pdf(cls, db: Session, report_id: UUID) -> bytes:

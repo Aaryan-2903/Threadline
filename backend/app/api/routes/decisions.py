@@ -3,7 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import check_write_permission
 from app.database import get_db
+from app.models.user import User
 from app.schemas.decision import DecisionCreate, DecisionResponse, DecisionUpdate
 from app.services import decision_service
 
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/decisions", tags=["decisions"])
 )
 def create_decision(
     decision_in: DecisionCreate,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> DecisionResponse:
     """Create a new decision record with project validation."""
@@ -82,6 +85,7 @@ def get_decision(
 def update_decision(
     decision_id: UUID,
     decision_in: DecisionUpdate,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> DecisionResponse:
     """Update decision fields and record activity event."""
@@ -102,6 +106,7 @@ def update_decision(
 def delete_decision(
     decision_id: UUID,
     actor: Optional[str] = Query(None, max_length=120, description="Actor deleting the decision"),
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> Response:
     """Delete a decision by ID."""

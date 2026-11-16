@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationProvider } from './context/NavigationContext';
 import { UserProfileProvider } from './context/UserProfileContext';
+import { AuthProvider } from './context/AuthContext';
 import { useNavigation } from './context/useNavigation';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewScreen } from './screens/OverviewScreen';
@@ -8,6 +9,7 @@ import { MyProjectsScreen } from './screens/MyProjectsScreen';
 import { ProjectWorkspaceScreen } from './screens/ProjectWorkspaceScreen';
 import { MyTasksScreen } from './screens/MyTasksScreen';
 import { DecisionsScreen } from './screens/DecisionsScreen';
+import { ConflictsScreen } from './screens/ConflictsScreen';
 import { ActivityTimelineScreen } from './screens/ActivityTimelineScreen';
 import { DocumentsScreen } from './screens/DocumentsScreen';
 import { AIReviewQueueScreen } from './screens/AIReviewQueueScreen';
@@ -30,6 +32,8 @@ const MainRouter: React.FC = () => {
       return <MyTasksScreen />;
     case 'decisions':
       return <DecisionsScreen />;
+    case 'conflicts':
+      return <ConflictsScreen />;
     case 'activity':
       return <ActivityTimelineScreen />;
 
@@ -58,13 +62,15 @@ const MainRouter: React.FC = () => {
 
 export function App() {
   return (
-    <UserProfileProvider>
-      <NavigationProvider>
-        <AppShell>
-          <MainRouter />
-        </AppShell>
-      </NavigationProvider>
-    </UserProfileProvider>
+    <AuthProvider>
+      <UserProfileProvider>
+        <NavigationProvider>
+          <AppShell>
+            <MainRouter />
+          </AppShell>
+        </NavigationProvider>
+      </UserProfileProvider>
+    </AuthProvider>
   );
 }
 

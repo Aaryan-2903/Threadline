@@ -54,19 +54,37 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     url = get_url()
     options = get_engine_options(url)
-    connectable = create_engine(url, **options)
+    try:
+        connectable = create_engine(url, **options)
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                render_as_batch=True,
+            )
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            render_as_batch=True,
-        )
+            with context.begin_transaction():
+                context.run_migrations()
 
-        with context.begin_transaction():
-            context.run_migrations()
+        connectable.dispose()
+    except Exception as exc:
+        if "psycopg" in str(exc) or "No module named" in str(exc):
+            fallback_url = "sqlite:///./threadline.db"
+            fallback_options = get_engine_options(fallback_url)
+            connectable = create_engine(fallback_url, **fallback_options)
+            with connectable.connect() as connection:
+                context.configure(
+                    connection=connection,
+                    target_metadata=target_metadata,
+                    render_as_batch=True,
+                )
 
-    connectable.dispose()
+                with context.begin_transaction():
+                    context.run_migrations()
+
+            connectable.dispose()
+        else:
+            raise exc
 
 
 if context.is_offline_mode():

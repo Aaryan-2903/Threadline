@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
 
+    # Authentication & JWT Configuration
+    JWT_SECRET_KEY: str = "threadline-super-secret-jwt-key-2026-production-ready-32bytes"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
     # DOCX ZIP Safety / Bomb Protection Limits
     MAX_DOCX_ENTRIES: int = 1000
     MAX_DOCX_TOTAL_UNCOMPRESSED_BYTES: int = 50 * 1024 * 1024  # 50 MB

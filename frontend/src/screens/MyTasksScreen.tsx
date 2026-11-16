@@ -137,10 +137,13 @@ export const MyTasksScreen: React.FC = () => {
   // Task Actions
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
-      const updated = await api.updateTask(taskId, {
-        status: newStatus,
-        actor: profile.displayName || 'User',
-      });
+      const updated = await api.updateTask(
+        taskId,
+        {
+          status: newStatus,
+        },
+        profile.displayName || 'User'
+      );
       setTasks(prev => prev.map(t => (t.id === taskId ? updated : t)));
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -179,16 +182,18 @@ export const MyTasksScreen: React.FC = () => {
     try {
       setSubmitting(true);
       setFormError(null);
-      const newTask = await api.createTask({
-        project_id: targetProjectId,
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        priority: formData.priority,
-        status: formData.status,
-        assignee: formData.assignee.trim() || undefined,
-        due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
-        actor: profile.displayName || 'User',
-      });
+      const newTask = await api.createTask(
+        {
+          project_id: targetProjectId,
+          title: formData.title.trim(),
+          description: formData.description.trim() || undefined,
+          priority: formData.priority,
+          status: formData.status,
+          assignee: formData.assignee.trim() || undefined,
+          due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
+        },
+        profile.displayName || 'User'
+      );
 
       setTasks(prev => [newTask, ...prev]);
       setSelectedTaskId(newTask.id);
@@ -221,15 +226,18 @@ export const MyTasksScreen: React.FC = () => {
     try {
       setSubmitting(true);
       setFormError(null);
-      const updated = await api.updateTask(selectedTask.id, {
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        priority: formData.priority,
-        status: formData.status,
-        assignee: formData.assignee.trim() || undefined,
-        due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
-        actor: profile.displayName || 'User',
-      });
+      const updated = await api.updateTask(
+        selectedTask.id,
+        {
+          title: formData.title.trim(),
+          description: formData.description.trim() || undefined,
+          priority: formData.priority,
+          status: formData.status,
+          assignee: formData.assignee.trim() || undefined,
+          due_date: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
+        },
+        profile.displayName || 'User'
+      );
 
       setTasks(prev => prev.map(t => (t.id === selectedTask.id ? updated : t)));
       setShowEditModal(false);

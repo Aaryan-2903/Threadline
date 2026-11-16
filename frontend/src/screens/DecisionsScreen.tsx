@@ -139,15 +139,17 @@ export const DecisionsScreen: React.FC = () => {
     try {
       setSubmitting(true);
       setFormError(null);
-      const newDecision = await api.createDecision({
-        project_id: targetProjId,
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        rationale: formData.rationale.trim() || undefined,
-        decided_by: formData.decidedBy.trim() || undefined,
-        decision_date: formData.decisionDate ? new Date(formData.decisionDate).toISOString() : undefined,
-        actor: profile.displayName || 'User',
-      });
+      const newDecision = await api.createDecision(
+        {
+          project_id: targetProjId,
+          title: formData.title.trim(),
+          description: formData.description.trim() || undefined,
+          rationale: formData.rationale.trim() || undefined,
+          decided_by: formData.decidedBy.trim() || undefined,
+          decision_date: formData.decisionDate ? new Date(formData.decisionDate).toISOString() : undefined,
+        },
+        profile.displayName || 'User'
+      );
 
       setDecisions(prev => [newDecision, ...prev]);
       setSelectedDecisionId(newDecision.id);
@@ -179,14 +181,17 @@ export const DecisionsScreen: React.FC = () => {
     try {
       setSubmitting(true);
       setFormError(null);
-      const updated = await api.updateDecision(selectedDecision.id, {
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        rationale: formData.rationale.trim() || undefined,
-        decided_by: formData.decidedBy.trim() || undefined,
-        decision_date: formData.decisionDate ? new Date(formData.decisionDate).toISOString() : undefined,
-        actor: profile.displayName || 'User',
-      });
+      const updated = await api.updateDecision(
+        selectedDecision.id,
+        {
+          title: formData.title.trim(),
+          description: formData.description.trim() || undefined,
+          rationale: formData.rationale.trim() || undefined,
+          decided_by: formData.decidedBy.trim() || undefined,
+          decision_date: formData.decisionDate ? new Date(formData.decisionDate).toISOString() : undefined,
+        },
+        profile.displayName || 'User'
+      );
 
       setDecisions(prev => prev.map(d => (d.id === selectedDecision.id ? updated : d)));
       setShowEditModal(false);

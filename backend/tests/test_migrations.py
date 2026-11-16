@@ -28,6 +28,9 @@ EXPECTED_TABLES = {
     "documents",
     "extracted_knowledge",
     "handover_reports",
+    "conflicts",
+    "audit_logs",
+    "users",
     "alembic_version",
 }
 

@@ -102,6 +102,14 @@ export const Sidebar: React.FC = () => {
               </div>
 
               <div
+                className={navItemClass('conflicts')}
+                onClick={() => navigate('conflicts')}
+              >
+                <span className={navIconClass('conflicts')}>warning_amber</span>
+                <span className="truncate">Conflicts</span>
+              </div>
+
+              <div
                 className={navItemClass('documents')}
                 onClick={() => navigate('documents')}
               >
@@ -115,6 +123,14 @@ export const Sidebar: React.FC = () => {
               >
                 <span className={navIconClass('handover-reports')}>assignment_turned_in</span>
                 <span className="truncate">Handover Reports</span>
+              </div>
+
+              <div
+                className={navItemClass('activity')}
+                onClick={() => navigate('activity')}
+              >
+                <span className={navIconClass('activity')}>history</span>
+                <span className="truncate">Activity Timeline</span>
               </div>
             </nav>
           </div>

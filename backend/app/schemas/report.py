@@ -137,9 +137,37 @@ class HandoverReportResponse(BaseModel):
     summary: Optional[str] = None
     status: str
     generated_by: Optional[str] = None
+    version: int = 1
+    outgoing_owner: Optional[str] = None
+    incoming_owner: Optional[str] = None
+    incoming_owner_role: Optional[str] = None
+    acknowledgement_status: str = "draft"
+    clarification_notes: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    acknowledged_at: Optional[datetime] = None
     content: HandoverReportContent
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class HandoverSendRequest(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    actor: Optional[str] = Field(default=None, max_length=120)
+
+
+class HandoverAcknowledgeRequest(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    acknowledged_by: Optional[str] = Field(default=None, max_length=120)
+
+
+class HandoverClarificationRequest(BaseModel):
+    clarification_notes: str = Field(min_length=1, max_length=5000)
+    requested_by: Optional[str] = Field(default=None, max_length=120)
+
+
+class HandoverVersionCreate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    actor: Optional[str] = Field(default=None, max_length=120)
 

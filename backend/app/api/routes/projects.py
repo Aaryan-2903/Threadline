@@ -3,8 +3,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import check_write_permission, get_current_user_optional
 from app.database import get_db
 from app.models.task import TaskPriority, TaskStatus
+from app.models.user import User, UserRole
 from app.schemas.activity import ActivityResponse
 from app.schemas.decision import DecisionCreate, DecisionResponse
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
@@ -22,6 +24,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 )
 def create_project(
     project_in: ProjectCreate,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> ProjectResponse:
     """Create a new project."""
@@ -72,6 +75,7 @@ def get_project(
 def update_project(
     project_id: UUID,
     project_in: ProjectUpdate,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> ProjectResponse:
     """Update project name, description or status."""
@@ -91,9 +95,17 @@ def update_project(
 )
 def delete_project(
     project_id: UUID,
+    current_user: Optional[User] = Depends(check_write_permission),
     db: Session = Depends(get_db),
 ) -> Response:
     """Delete a project by its ID."""
+    if current_user is not None:
+        role_val = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+        if role_val not in (UserRole.ADMIN.value, UserRole.PROJECT_OWNER.value):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Deleting a project requires Project Owner or Admin role. Your role is '{role_val}'.",
+            )
     project = project_service.get_project_by_id(db=db, project_id=project_id)
     if not project:
         raise HTTPException(

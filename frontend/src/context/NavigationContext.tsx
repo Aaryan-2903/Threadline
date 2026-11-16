@@ -61,6 +61,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         'project-workspace',
         'my-tasks',
         'decisions',
+        'conflicts',
         'activity',
         'documents',
         'handover-reports',
