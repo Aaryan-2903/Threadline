@@ -2,8 +2,10 @@ import React from 'react';
 import { NavigationProvider } from './context/NavigationContext';
 import { UserProfileProvider } from './context/UserProfileContext';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 import { useNavigation } from './context/useNavigation';
 import { AppShell } from './components/layout/AppShell';
+import { LoginScreen } from './screens/LoginScreen';
 import { OverviewScreen } from './screens/OverviewScreen';
 import { MyProjectsScreen } from './screens/MyProjectsScreen';
 import { ProjectWorkspaceScreen } from './screens/ProjectWorkspaceScreen';
@@ -36,7 +38,6 @@ const MainRouter: React.FC = () => {
       return <ConflictsScreen />;
     case 'activity':
       return <ActivityTimelineScreen />;
-
     case 'documents':
       return <DocumentsScreen />;
     case 'handover-reports':
@@ -60,14 +61,42 @@ const MainRouter: React.FC = () => {
   }
 };
 
+const AuthenticatedApp: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-surface-container-low select-none">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-on-primary font-bold text-lg shadow-md animate-pulse">
+            TL
+          </div>
+          <div className="flex items-center gap-2 text-on-surface-variant font-label-md text-xs">
+            <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+            <span>Restoring secure session...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <AppShell>
+      <MainRouter />
+    </AppShell>
+  );
+};
+
 export function App() {
   return (
     <AuthProvider>
       <UserProfileProvider>
         <NavigationProvider>
-          <AppShell>
-            <MainRouter />
-          </AppShell>
+          <AuthenticatedApp />
         </NavigationProvider>
       </UserProfileProvider>
     </AuthProvider>

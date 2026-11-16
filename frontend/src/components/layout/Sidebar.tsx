@@ -1,11 +1,13 @@
 import React from 'react';
 import { useNavigation } from '../../context/useNavigation';
 import { useUserProfile } from '../../context/useUserProfile';
+import { useAuth } from '../../context/useAuth';
 import type { ScreenId } from '../../types';
 
 export const Sidebar: React.FC = () => {
   const { currentScreen, navigate, workspaceName } = useNavigation();
   const { profile, initials } = useUserProfile();
+  const { user, logout } = useAuth();
 
   const navItemClass = (screen: ScreenId) => {
     const isActive = currentScreen === screen;
@@ -187,23 +189,32 @@ export const Sidebar: React.FC = () => {
         </nav>
 
         {/* User Profile Card */}
-        <div
-          onClick={() => navigate('settings')}
-          className="flex items-center gap-space-sm p-space-xs pt-space-sm rounded hover:bg-surface-container-low cursor-pointer transition-colors group"
-          title="Click to view and personalize profile"
-        >
-          <div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0">
-            {initials}
+        <div className="flex items-center justify-between p-space-xs pt-space-sm rounded hover:bg-surface-container-low transition-colors group">
+          <div
+            onClick={() => navigate('settings')}
+            className="flex items-center gap-space-sm min-w-0 flex-1 cursor-pointer"
+            title="Click to view and personalize profile"
+          >
+            <div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0">
+              {user ? user.username.slice(0, 2).toUpperCase() : initials}
+            </div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="font-label-md text-label-md text-on-surface font-medium truncate group-hover:text-primary transition-colors">
+                {user ? user.username : (profile.displayName || 'User')}
+              </p>
+              <p className="font-label-sm text-label-sm text-outline truncate text-[11px] uppercase">
+                {user ? user.role.replace('_', ' ') : (profile.role || 'Personal Profile')}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="font-label-md text-label-md text-on-surface font-medium truncate group-hover:text-primary transition-colors">
-              {profile.displayName || 'User'}
-            </p>
-            <p className="font-label-sm text-label-sm text-outline truncate text-[11px]">
-              {profile.role || 'Personal Profile'}
-            </p>
-          </div>
-          <span className="material-symbols-outlined text-[16px] text-outline group-hover:text-on-surface">tune</span>
+          <button
+            onClick={logout}
+            className="p-1 rounded text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+            title="Sign Out"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[16px]">logout</span>
+          </button>
         </div>
       </div>
     </aside>

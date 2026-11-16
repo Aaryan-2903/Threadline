@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import type { ConflictItem, Project, UserRole } from '../types';
+import type { ConflictItem, Project } from '../types';
 import { api } from '../api/client';
 import { useAuth } from '../context/useAuth';
 import { useNavigation } from '../context/useNavigation';
@@ -131,8 +131,8 @@ export const ConflictsScreen: React.FC = () => {
   const resolvedCount = conflicts.filter((c) => c.status === 'resolved').length;
   const dismissedCount = conflicts.filter((c) => c.status === 'dismissed').length;
 
-  const userRoleStr = (user?.role || 'project_owner') as UserRole;
-  const canResolve = userRoleStr === 'admin' || userRoleStr === 'project_owner';
+  const userRole = user?.role;
+  const canResolve = Boolean(userRole && (userRole === 'admin' || userRole === 'project_owner'));
 
   const getTypeLabel = (type: string) => {
     switch (type) {

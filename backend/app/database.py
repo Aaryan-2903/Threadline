@@ -41,12 +41,16 @@ def get_engine_options(url: str) -> dict:
 def init_engine():
     url = settings.DATABASE_URL
     try:
-        return create_engine(url, **get_engine_options(url))
+        eng = create_engine(url, **get_engine_options(url))
+        if not url.startswith("sqlite"):
+            # Verify connectivity to remote database on startup
+            with eng.connect():
+                pass
+        return eng
     except Exception as exc:
-        if "psycopg" in str(exc) or "No module named" in str(exc):
-            fallback_url = "sqlite:///./threadline.db"
-            return create_engine(fallback_url, **get_engine_options(fallback_url))
-        raise exc
+        fallback_url = "sqlite:///./threadline.db"
+        print(f"[Threadline DB] Remote connection to DATABASE_URL failed ({exc}). Falling back to local SQLite ({fallback_url}).")
+        return create_engine(fallback_url, **get_engine_options(fallback_url))
 
 
 engine = init_engine()

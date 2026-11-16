@@ -3,12 +3,11 @@ import { useNavigation } from '../../context/useNavigation';
 import { useUserProfile } from '../../context/useUserProfile';
 import { useAuth } from '../../context/useAuth';
 import { AuditTrailModal } from '../common/AuditTrailModal';
-import type { UserRole } from '../../types';
 
 export const TopHeader: React.FC = () => {
   const { currentScreen, selectedProjectId, navigate, searchQuery, setSearchQuery } = useNavigation();
-  const { profile, initials } = useUserProfile();
-  const { user, isAuthenticated, demoLogin, logout, switchRole, isDemo } = useAuth();
+  const { initials } = useUserProfile();
+  const { user, isAuthenticated, demoLogin, logout, isDemo } = useAuth();
   const [showAuditModal, setShowAuditModal] = useState(false);
 
   // Dynamic breadcrumbs based on active screen
@@ -107,7 +106,7 @@ export const TopHeader: React.FC = () => {
 
         {/* Right Controls */}
         <div className="flex items-center gap-space-md">
-          {/* Judge Demo Login or Role Indicator */}
+          {/* Judge Demo Login or Server-Enforced Role Indicator */}
           {!isAuthenticated ? (
             <button
               onClick={demoLogin}
@@ -119,19 +118,12 @@ export const TopHeader: React.FC = () => {
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              {/* Role Switcher Pill for Judge Testing */}
-              <div className="flex items-center gap-1 bg-surface-container-low px-2.5 py-1 rounded-lg border border-outline-variant/30 text-[11px]">
-                <span className="font-semibold text-gray-500">Role:</span>
-                <select
-                  value={user?.role || 'project_owner'}
-                  onChange={(e) => switchRole(e.target.value as UserRole)}
-                  className="bg-transparent font-bold text-indigo-700 cursor-pointer focus:outline-hidden uppercase"
-                >
-                  <option value="project_owner">Project Owner</option>
-                  <option value="admin">Admin</option>
-                  <option value="contributor">Contributor</option>
-                  <option value="viewer">Viewer (Read-Only)</option>
-                </select>
+              {/* Authenticated Server-Enforced Role Badge */}
+              <div className="flex items-center gap-1.5 bg-surface-container-low px-2.5 py-1 rounded-lg border border-outline-variant/30 text-[11px]">
+                <span className="font-semibold text-outline">Role:</span>
+                <span className="font-bold text-primary uppercase tracking-wide">
+                  {user?.role.replace('_', ' ') || 'PROJECT OWNER'}
+                </span>
               </div>
 
               {isDemo && (
@@ -176,21 +168,36 @@ export const TopHeader: React.FC = () => {
             </div>
           </div>
 
-          {/* + New Button */}
-          <button
-            onClick={() => navigate('my-projects')}
-            className="flex items-center gap-1 bg-primary hover:bg-primary-container text-on-primary h-8 px-space-md rounded font-label-md text-label-md shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-colors cursor-pointer select-none"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[16px]">add</span>
-            <span>New</span>
-          </button>
+          {/* + New Button (Disabled for Read-Only Viewers) */}
+          {user?.role !== 'viewer' && (
+            <button
+              onClick={() => navigate('my-projects')}
+              className="flex items-center gap-1 bg-primary hover:bg-primary-container text-on-primary h-8 px-space-md rounded font-label-md text-label-md shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-colors cursor-pointer select-none"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              <span>New</span>
+            </button>
+          )}
+
+          {/* Sign Out Button */}
+          {isAuthenticated && (
+            <button
+              onClick={logout}
+              className="flex items-center gap-1 text-on-surface-variant hover:text-error hover:bg-surface-container-low px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer"
+              title="Sign Out of Threadline"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[15px]">logout</span>
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
+          )}
 
           {/* Avatar / Profile Trigger */}
           <div
-            onClick={() => (isAuthenticated ? logout() : navigate('settings'))}
+            onClick={() => navigate('settings')}
             className="w-7 h-7 rounded-full bg-primary hover:bg-primary-container text-on-primary flex items-center justify-center font-bold text-[10px] shrink-0 ml-1 cursor-pointer transition-colors shadow-xs"
-            title={isAuthenticated ? `Signed in as ${user?.username} (Click to Logout)` : `Profile settings (${profile.displayName || 'User'})`}
+            title={`Signed in as ${user?.username || 'User'} (${user?.role || 'Guest'}) — Click to view settings`}
           >
             {user ? user.username.slice(0, 2).toUpperCase() : initials}
           </div>
